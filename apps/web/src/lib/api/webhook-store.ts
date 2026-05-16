@@ -21,6 +21,14 @@ export function listForOwner(owner: string): Webhook[] {
   return [...STORE.values()].filter((w) => w.owner === owner);
 }
 
+export function listAllWebhooks(): Webhook[] {
+  return [...STORE.values()];
+}
+
+export function getWebhook(id: string): Webhook | undefined {
+  return STORE.get(id);
+}
+
 export function createWebhook(input: {
   owner: string;
   url: string;

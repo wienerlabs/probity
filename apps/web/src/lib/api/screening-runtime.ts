@@ -7,6 +7,7 @@ import { screen } from "@probity/engine";
 import { HeliusClient, fetchTokenState, isLikelyBase58Pubkey } from "@probity/solana";
 import type { EnrichmentBundle, ScreeningContext, VerdictRecord } from "@probity/types";
 import { findRecord } from "@/lib/screening";
+import { emit } from "./events";
 
 const RULE_VERSION = "0.1.0";
 
@@ -23,6 +24,16 @@ export interface ResolvedVerdict {
 export async function resolveVerdict(query: string): Promise<ResolvedVerdict | null> {
   const fixture = findRecord(query);
   if (fixture) {
+    emit({
+      event: "verdict.computed",
+      data: {
+        mint: fixture.verdict.mint,
+        verdict: fixture.verdict.verdict,
+        rule_version: fixture.verdict.ruleVersion,
+        evidence_hash: fixture.verdict.evidenceHash,
+        source: "fixture",
+      },
+    });
     return {
       mint: fixture.verdict.mint,
       source: "fixture",
@@ -53,6 +64,16 @@ export async function resolveVerdict(query: string): Promise<ResolvedVerdict | n
       enrichment,
     };
     const verdict = await screen(ctx);
+    emit({
+      event: "verdict.computed",
+      data: {
+        mint: state.mint,
+        verdict: verdict.verdict,
+        rule_version: verdict.ruleVersion,
+        evidence_hash: verdict.evidenceHash,
+        source: "live",
+      },
+    });
     return {
       mint: state.mint,
       source: "live",
