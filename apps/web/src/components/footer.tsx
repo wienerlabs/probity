@@ -1,11 +1,22 @@
+import Image from "next/image";
+
 export function Footer() {
   return (
-    <footer className="hairline border-block-start border-t border-[var(--color-border)] mt-24">
+    <footer className="border-t border-[var(--color-border)] mt-24">
       <div className="container-page py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-3">
-            Probity
-          </p>
+          <div className="flex items-center gap-2 mb-3">
+            <Image
+              src="/probity-mark.png"
+              alt=""
+              width={18}
+              height={18}
+              className="invert opacity-70"
+            />
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)]">
+              Probity
+            </p>
+          </div>
           <p className="text-[var(--color-muted)] max-w-[28ch] leading-relaxed">
             The compliance verdict on every Solana token. The fit and proper test for digital
             assets.

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export function Header() {
   return (
@@ -42,33 +43,16 @@ export function Header() {
 
 function Wordmark() {
   return (
-    <span className="flex items-center gap-2">
-      <svg
-        width="22"
-        height="22"
-        viewBox="0 0 22 22"
-        fill="none"
-        aria-hidden
-        className="text-[var(--color-text)]"
-      >
-        <rect
-          x="1"
-          y="1"
-          width="20"
-          height="20"
-          rx="3"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        />
-        <path
-          d="M6 15.5L9 9.5L11.5 13.5L14 6L16 15.5"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      </svg>
-      <span className="text-lg font-semibold">Probity</span>
+    <span className="flex items-center gap-2.5">
+      <Image
+        src="/probity-mark.png"
+        alt=""
+        width={28}
+        height={28}
+        priority
+        className="block invert"
+      />
+      <span className="text-lg font-semibold tracking-tight">Probity</span>
     </span>
   );
 }
