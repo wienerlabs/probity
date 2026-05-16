@@ -1,10 +1,15 @@
-// Runtime entry point that any API route can call. Live mode is wired
-// behind HELIUS_API_KEY: when set and the requested mint isn't in the
-// demo fixture set, we attempt an on-chain fetch + minimal enrichment.
-// Without the key, only fixture mints resolve.
+// Runtime entry point that any API route can call. Live mode unfolds in
+// two stages, each gated on an environment variable:
+//   1. HELIUS_API_KEY  → pull SolanaTokenState on-chain.
+//   2. ANTHROPIC_API_KEY → upgrade enrichment by asking Claude to extract
+//      a RevenueModel + GovernanceShape from supplied documents (or from
+//      the chain state alone when no docs are supplied).
+// If either is missing, we degrade gracefully: HELIUS off → fixture-only,
+// HELIUS on + ANTHROPIC off → synthesised enrichment (legacy path).
 
 import { screen } from "@probity/engine";
 import { HeliusClient, fetchTokenState, isLikelyBase58Pubkey } from "@probity/solana";
+import { ClaudeClient, enrichTokenFromDocs } from "@probity/enrichment";
 import type { EnrichmentBundle, ScreeningContext, VerdictRecord } from "@probity/types";
 import { findRecord } from "@/lib/screening";
 import { emit } from "./events";
@@ -19,6 +24,7 @@ export interface ResolvedVerdict {
   priceSeries?: { time: number; open: number; high: number; low: number; close: number }[];
   holderSeries?: { time: number; value: number }[];
   warnings?: string[];
+  enrichment_source?: "claude" | "synthesised";
 }
 
 export async function resolveVerdict(query: string): Promise<ResolvedVerdict | null> {
@@ -47,15 +53,47 @@ export async function resolveVerdict(query: string): Promise<ResolvedVerdict | n
     return null;
   }
 
-  const apiKey = process.env.HELIUS_API_KEY;
-  if (!apiKey) {
+  const heliusKey = process.env.HELIUS_API_KEY;
+  if (!heliusKey) {
     return null;
   }
 
-  const client = new HeliusClient({ apiKey });
+  const client = new HeliusClient({ apiKey: heliusKey });
+  const warnings: string[] = [];
+  let enrichmentSource: "claude" | "synthesised" = "synthesised";
+
   try {
     const state = await fetchTokenState(client, query);
-    const enrichment = synthesiseEnrichment(state);
+
+    let enrichment: EnrichmentBundle;
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (anthropicKey) {
+      try {
+        const claude = new ClaudeClient({
+          apiKey: anthropicKey,
+          ...(process.env.ANTHROPIC_MODEL
+            ? { model: process.env.ANTHROPIC_MODEL }
+            : {}),
+        });
+        enrichment = await enrichTokenFromDocs(
+          { state, documents: [] },
+          { client: claude },
+        );
+        enrichmentSource = "claude";
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        warnings.push(
+          `Claude enrichment failed (${msg}); fell back to synthesised model.`,
+        );
+        enrichment = synthesiseEnrichment(state);
+      }
+    } else {
+      enrichment = synthesiseEnrichment(state);
+      warnings.push(
+        "ANTHROPIC_API_KEY not set; enrichment is synthesised from on-chain state only.",
+      );
+    }
+
     const ctx: ScreeningContext = {
       mint: state.mint,
       ruleVersion: RULE_VERSION,
@@ -64,6 +102,7 @@ export async function resolveVerdict(query: string): Promise<ResolvedVerdict | n
       enrichment,
     };
     const verdict = await screen(ctx);
+
     emit({
       event: "verdict.computed",
       data: {
@@ -72,15 +111,19 @@ export async function resolveVerdict(query: string): Promise<ResolvedVerdict | n
         rule_version: verdict.ruleVersion,
         evidence_hash: verdict.evidenceHash,
         source: "live",
+        enrichment_source: enrichmentSource,
       },
     });
+
     return {
       mint: state.mint,
       source: "live",
       verdict,
       warnings: [
-        "Live mode: revenue model + governance details are inferred from on-chain state only. Verdict is provisional pending full enrichment (M2.5).",
+        "Live mode: enrichment is best-effort; verdict is provisional pending named-source audit corroboration.",
+        ...warnings,
       ],
+      enrichment_source: enrichmentSource,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -88,10 +131,10 @@ export async function resolveVerdict(query: string): Promise<ResolvedVerdict | n
   }
 }
 
-// Until packages/enrichment lands, synthesise a conservative enrichment
-// from the on-chain state alone. Defaults bias toward mushtabah (flag)
-// rather than haram on missing data, so live verdicts are clearly marked
-// as "needs human review" without false positives.
+// Conservative fallback when ANTHROPIC_API_KEY is absent — derives only
+// from on-chain state. Biases toward flag/mushtabah on missing data so
+// live verdicts are marked "needs human review" without false-positive
+// fails.
 function synthesiseEnrichment(state: {
   mintAuthority: string | null;
   freezeAuthority: string | null;

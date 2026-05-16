@@ -23,6 +23,9 @@ importers:
       '@probity/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@probity/enrichment':
+        specifier: workspace:*
+        version: link:../../packages/enrichment
       '@probity/solana':
         specifier: workspace:*
         version: link:../../packages/solana
@@ -69,6 +72,19 @@ importers:
       '@probity/rules':
         specifier: workspace:*
         version: link:../rules
+      '@probity/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.4(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)
+
+  packages/enrichment:
+    dependencies:
       '@probity/types':
         specifier: workspace:*
         version: link:../types

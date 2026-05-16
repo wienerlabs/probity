@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@probity/engine": "workspace:*",
+    "@probity/enrichment": "workspace:*",
     "@probity/solana": "workspace:*",
     "@probity/types": "workspace:*",
     "lightweight-charts": "^5.0.4",

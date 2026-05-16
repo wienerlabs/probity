@@ -8,6 +8,7 @@ const config: NextConfig = {
     "@probity/engine",
     "@probity/rules",
     "@probity/solana",
+    "@probity/enrichment",
   ],
 };
 
