@@ -11,6 +11,8 @@
     "clean": "rm -rf .next .turbo"
   },
   "dependencies": {
+    "@probity/engine": "workspace:*",
+    "@probity/types": "workspace:*",
     "lightweight-charts": "^5.0.4",
     "next": "16.0.0",
     "react": "19.0.0",

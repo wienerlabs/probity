@@ -2,20 +2,20 @@ import Link from "next/link";
 import { LookupForm } from "@/components/lookup-form";
 import { VerdictCard } from "@/components/verdict-card";
 import { VerdictBadge } from "@/components/verdict-badge";
-import { VERDICTS } from "@/lib/mock";
+import { RECORDS } from "@/lib/screening";
 
 export default function HomePage() {
   const counts = {
-    halal: VERDICTS.filter((v) => v.verdict === "halal").length,
-    mushtabah: VERDICTS.filter((v) => v.verdict === "mushtabah").length,
-    haram: VERDICTS.filter((v) => v.verdict === "haram").length,
+    halal: RECORDS.filter((r) => r.verdict.verdict === "halal").length,
+    mushtabah: RECORDS.filter((r) => r.verdict.verdict === "mushtabah").length,
+    haram: RECORDS.filter((r) => r.verdict.verdict === "haram").length,
   };
 
   return (
     <div className="container-page py-16 md:py-24">
       <section className="max-w-3xl">
         <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-muted-2)] mb-5">
-          Demo dataset · rule v0.1.0
+          Demo dataset · rule v0.1.0 · engine deterministic
         </p>
         <h1 className="text-4xl md:text-6xl font-light tracking-tight leading-[1.05]">
           The compliance verdict on{" "}
@@ -81,12 +81,12 @@ export default function HomePage() {
         <header className="flex items-baseline justify-between mb-6">
           <h2 className="text-xl font-medium">Recently screened</h2>
           <p className="text-xs mono uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
-            {VERDICTS.length} tokens · last 24h
+            {RECORDS.length} tokens · last 24h
           </p>
         </header>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {VERDICTS.map((v) => (
-            <VerdictCard key={v.mint} record={v} />
+          {RECORDS.map((r) => (
+            <VerdictCard key={r.verdict.mint} record={r} />
           ))}
         </div>
       </section>
