@@ -14,9 +14,7 @@ export default function HomePage() {
   return (
     <div className="container-page py-16 md:py-24">
       <section className="max-w-3xl">
-        <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-muted-2)] mb-5">
-          Demo dataset · rule v0.1.0 · engine deterministic
-        </p>
+        <span className="chip mb-6">Demo dataset · rule v0.1.0</span>
         <h1 className="text-4xl md:text-6xl font-light tracking-tight leading-[1.05]">
           The compliance verdict on{" "}
           <span className="font-semibold">every Solana token.</span>
@@ -29,34 +27,19 @@ export default function HomePage() {
 
         <div className="mt-10">
           <LookupForm />
-          <p className="mt-3 text-xs text-[var(--color-muted-2)]">
+          <p className="mt-4 text-xs text-[var(--color-muted-2)]">
             Try{" "}
-            <Link
-              href="/verdict/Pr0biTy22222222222222222222222222222222UTL2"
-              className="mono hover:text-[var(--color-text)]"
-            >
-              UTL
-            </Link>
+            <TryLink mint="Pr0biTy22222222222222222222222222222222UTL2">UTL</TryLink>
             ,{" "}
-            <Link
-              href="/verdict/Pr0biTy11111111111111111111111111111111SOL1"
-              className="mono hover:text-[var(--color-text)]"
-            >
-              DSTB
-            </Link>
+            <TryLink mint="Pr0biTy11111111111111111111111111111111SOL1">DSTB</TryLink>
             , or{" "}
-            <Link
-              href="/verdict/Pr0biTy33333333333333333333333333333333LND3"
-              className="mono hover:text-[var(--color-text)]"
-            >
-              LND
-            </Link>
+            <TryLink mint="Pr0biTy33333333333333333333333333333333LND3">LND</TryLink>
             .
           </p>
         </div>
       </section>
 
-      <section className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-px bg-[var(--color-border)] border border-[var(--color-border)]">
+      <section className="mt-20 grid grid-cols-1 md:grid-cols-3 grid-bordered">
         <Tile
           label="Halal"
           accent="var(--color-halal)"
@@ -84,14 +67,14 @@ export default function HomePage() {
             {RECORDS.length} tokens · last 24h
           </p>
         </header>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {RECORDS.map((r) => (
             <VerdictCard key={r.verdict.mint} record={r} />
           ))}
         </div>
       </section>
 
-      <section className="mt-24 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <section className="mt-24 grid grid-cols-1 lg:grid-cols-3 gap-5">
         <FrameworkBlock
           label="Halal"
           verdict="halal"
@@ -112,6 +95,17 @@ export default function HomePage() {
   );
 }
 
+function TryLink({ mint, children }: { mint: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={`/verdict/${mint}`}
+      className="mono hover:text-[var(--color-text)] underline-offset-4 hover:underline"
+    >
+      {children}
+    </Link>
+  );
+}
+
 function Tile({
   label,
   accent,
@@ -124,21 +118,21 @@ function Tile({
   sub: string;
 }) {
   return (
-    <div className="bg-[var(--color-bg)] p-6 md:p-8">
-      <div className="flex items-center gap-2 mb-4">
+    <div className="p-7 md:p-8">
+      <div className="flex items-center gap-2 mb-5">
         <span
           aria-hidden
           className="inline-block w-1.5 h-1.5 rounded-full"
-          style={{ background: accent }}
+          style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}
         />
         <span
-          className="text-xs uppercase tracking-[0.2em]"
+          className="text-[11px] uppercase tracking-[0.2em] font-medium"
           style={{ color: accent }}
         >
           {label}
         </span>
       </div>
-      <p className="text-5xl font-light num">{headline}</p>
+      <p className="text-5xl font-light num tracking-tight">{headline}</p>
       <p className="text-sm text-[var(--color-muted)] mt-2">{sub}</p>
     </div>
   );
@@ -155,7 +149,7 @@ function FrameworkBlock({
 }) {
   return (
     <div className="surface p-6">
-      <VerdictBadge verdict={verdict} />
+      <VerdictBadge verdict={verdict} glow />
       <p className="mt-5 text-lg font-medium">{label}</p>
       <p className="mt-2 text-sm text-[var(--color-muted)] leading-relaxed">
         {text}

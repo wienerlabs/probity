@@ -25,14 +25,14 @@ export default async function VerdictPage({ params }: PageProps) {
     <div className="container-page py-12 md:py-16">
       <Link
         href="/"
-        className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)] hover:text-[var(--color-text)] transition-colors"
+        className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] hover:text-[var(--color-text)] transition-colors"
       >
         ← Dashboard
       </Link>
 
       <header className="mt-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)]">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)]">
             {meta.symbol} · {meta.name}
           </p>
           <h1 className="mt-2 text-3xl md:text-5xl font-light tracking-tight">
@@ -45,10 +45,10 @@ export default async function VerdictPage({ params }: PageProps) {
             {verdict.mint}
           </p>
         </div>
-        <VerdictBadge verdict={verdict.verdict} size="lg" />
+        <VerdictBadge verdict={verdict.verdict} size="lg" glow />
       </header>
 
-      <section className="mt-10 grid grid-cols-2 md:grid-cols-5 gap-px bg-[var(--color-border)] border border-[var(--color-border)]">
+      <section className="mt-10 grid grid-cols-2 md:grid-cols-5 grid-bordered">
         <Meta label="Decimals" value={state.decimals.toString()} />
         <Meta label="Supply" value={state.supply} />
         <Meta
@@ -59,20 +59,21 @@ export default async function VerdictPage({ params }: PageProps) {
         <Meta label="Freeze authority" value={authStatus(state.freezeAuthority)} />
       </section>
 
-      <section className="mt-10 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <section className="mt-10 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
         <PriceChart
           verdict={verdict.verdict}
           price={r.priceSeries}
           holders={r.holderSeries}
         />
-        <div className="surface p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+        <div className="surface p-6">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
             Score breakdown
           </p>
           <ScoreBars scores={verdict.scoreBreakdown} />
-          <div className="mt-6 pt-5 border-t border-[var(--color-border)] grid grid-cols-2 gap-3 text-xs">
+          <Divider />
+          <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
-              <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+              <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)] text-[10px]">
                 Computed
               </p>
               <p className="mono mt-1 text-[var(--color-text)]">
@@ -80,7 +81,7 @@ export default async function VerdictPage({ params }: PageProps) {
               </p>
             </div>
             <div>
-              <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+              <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)] text-[10px]">
                 Expires
               </p>
               <p className="mono mt-1 text-[var(--color-text)]">
@@ -89,31 +90,30 @@ export default async function VerdictPage({ params }: PageProps) {
             </div>
           </div>
           {verdict.attestationPubkey && (
-            <div className="mt-6 pt-5 border-t border-[var(--color-border)]">
-              <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)] text-xs">
+            <>
+              <Divider />
+              <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)] text-[10px]">
                 On-chain attestation
               </p>
               <p className="mono text-xs mt-1 text-[var(--color-text)] break-all">
                 {truncateMiddle(verdict.attestationPubkey, 10, 10)}
               </p>
-            </div>
+            </>
           )}
-          <div className="mt-6 pt-5 border-t border-[var(--color-border)]">
-            <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)] text-xs">
-              Evidence hash
-            </p>
-            <p className="mono text-xs mt-1 text-[var(--color-muted)] break-all">
-              {verdict.evidenceHash}
-            </p>
-          </div>
-          <div className="mt-6 pt-5 border-t border-[var(--color-border)]">
-            <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)] text-xs">
-              Snapshot slot
-            </p>
-            <p className="mono num text-sm mt-1 text-[var(--color-text)]">
-              {state.snapshotSlot.toLocaleString()}
-            </p>
-          </div>
+          <Divider />
+          <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)] text-[10px]">
+            Evidence hash
+          </p>
+          <p className="mono text-xs mt-1 text-[var(--color-muted)] break-all">
+            {verdict.evidenceHash}
+          </p>
+          <Divider />
+          <p className="uppercase tracking-[0.18em] text-[var(--color-muted-2)] text-[10px]">
+            Snapshot slot
+          </p>
+          <p className="mono num text-sm mt-1 text-[var(--color-text)]">
+            {state.snapshotSlot.toLocaleString()}
+          </p>
         </div>
       </section>
 
@@ -130,7 +130,7 @@ export default async function VerdictPage({ params }: PageProps) {
       </section>
 
       <section className="mt-20">
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
           Screen another token
         </p>
         <LookupForm />
@@ -139,13 +139,22 @@ export default async function VerdictPage({ params }: PageProps) {
   );
 }
 
+function Divider() {
+  return (
+    <div
+      className="my-5"
+      style={{ borderTop: "1px solid var(--color-border)" }}
+    />
+  );
+}
+
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-[var(--color-bg)] p-4">
+    <div className="p-5">
       <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
         {label}
       </p>
-      <p className="mono num text-sm text-[var(--color-text)] mt-1 truncate">
+      <p className="mono num text-sm text-[var(--color-text)] mt-1.5 truncate">
         {value}
       </p>
     </div>

@@ -41,9 +41,9 @@ export default function InstitutionalPage() {
         defensible audit trail.
       </p>
 
-      <section className="mt-14 grid grid-cols-1 md:grid-cols-2 gap-px bg-[var(--color-border)] border border-[var(--color-border)]">
+      <section className="mt-14 grid grid-cols-1 md:grid-cols-2 grid-bordered">
         {FEATURES.map((f) => (
-          <div key={f.title} className="bg-[var(--color-bg)] p-6">
+          <div key={f.title} className="p-7">
             <p className="text-sm font-medium">{f.title}</p>
             <p className="mt-2 text-sm text-[var(--color-muted)] leading-relaxed">
               {f.text}

@@ -8,20 +8,20 @@ const OUTCOME_STYLES: Record<
   pass: {
     label: "Pass",
     color: "var(--color-halal)",
-    bg: "rgba(16, 185, 129, 0.08)",
-    border: "rgba(16, 185, 129, 0.32)",
+    bg: "var(--color-halal-bg)",
+    border: "var(--color-halal-border)",
   },
   flag: {
     label: "Flag",
     color: "var(--color-mushtabah)",
-    bg: "rgba(245, 158, 11, 0.08)",
-    border: "rgba(245, 158, 11, 0.32)",
+    bg: "var(--color-mushtabah-bg)",
+    border: "var(--color-mushtabah-border)",
   },
   fail: {
     label: "Fail",
     color: "var(--color-haram)",
-    bg: "rgba(244, 63, 94, 0.08)",
-    border: "rgba(244, 63, 94, 0.32)",
+    bg: "var(--color-haram-bg)",
+    border: "var(--color-haram-border)",
   },
 };
 
@@ -38,12 +38,12 @@ export function RuleTable({ outcomes }: { outcomes: RuleOutcome[] }) {
 function RuleRow({ outcome }: { outcome: RuleOutcome }) {
   const s = OUTCOME_STYLES[outcome.outcome];
   return (
-    <details className="surface p-4 group" open={outcome.outcome !== "pass"}>
+    <details className="surface p-5 group" open={outcome.outcome !== "pass"}>
       <summary className="flex items-start justify-between gap-6 cursor-pointer list-none">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1.5">
+          <div className="flex items-center gap-2.5 mb-2 flex-wrap">
             <span
-              className="px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] rounded-[2px]"
+              className="px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] rounded-full font-medium"
               style={{
                 background: s.bg,
                 border: `1px solid ${s.border}`,
@@ -52,12 +52,10 @@ function RuleRow({ outcome }: { outcome: RuleOutcome }) {
             >
               {s.label}
             </span>
-            <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
-              {outcome.category}
-            </span>
+            <span className="chip">{outcome.category}</span>
             {outcome.material && (
-              <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
-                · material
+              <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+                material
               </span>
             )}
           </div>
@@ -76,8 +74,11 @@ function RuleRow({ outcome }: { outcome: RuleOutcome }) {
           ›
         </span>
       </summary>
-      <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
-        <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)] mb-3">
+      <div
+        className="mt-4 pt-4"
+        style={{ borderTop: "1px solid var(--color-border)" }}
+      >
+        <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] mb-3">
           Evidence
         </p>
         <CitationList citations={outcome.evidence} />

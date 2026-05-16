@@ -1,37 +1,47 @@
 import Link from "next/link";
 import Image from "next/image";
+import { ThemeToggle } from "./theme-toggle";
 
 export function Header() {
   return (
-    <header className="hairline">
+    <header
+      className="sticky top-0 z-30 backdrop-blur"
+      style={{
+        background:
+          "color-mix(in oklab, var(--color-bg) 80%, transparent)",
+        borderBottom: "1px solid var(--color-border)",
+      }}
+    >
       <div className="container-page flex items-center justify-between h-16">
         <Link
           href="/"
-          className="flex items-center gap-3 tracking-tight"
+          className="flex items-center gap-2.5 tracking-tight"
           aria-label="Probity home"
         >
-          <Wordmark />
-          <span className="text-xs mono uppercase text-[var(--color-muted-2)] tracking-[0.2em]">
+          <Image
+            src="/probity-mark.png"
+            alt=""
+            width={28}
+            height={28}
+            priority
+            style={{ filter: "invert(var(--logo-invert))" }}
+            className="block"
+          />
+          <span className="text-lg font-semibold tracking-tight">Probity</span>
+          <span className="text-[10px] mono uppercase tracking-[0.2em] text-[var(--color-muted-2)] ml-1">
             v0
           </span>
         </Link>
 
-        <nav className="flex items-center gap-6 text-sm text-[var(--color-muted)]">
-          <Link href="/" className="hover:text-[var(--color-text)] transition-colors">
-            Dashboard
-          </Link>
-          <Link
-            href="/framework"
-            className="hover:text-[var(--color-text)] transition-colors"
-          >
-            Framework
-          </Link>
-          <Link href="/api" className="hover:text-[var(--color-text)] transition-colors">
-            API
-          </Link>
+        <nav className="flex items-center gap-1 text-sm text-[var(--color-muted)]">
+          <NavLink href="/">Dashboard</NavLink>
+          <NavLink href="/framework">Framework</NavLink>
+          <NavLink href="/api">API</NavLink>
+          <span className="mx-2 h-5 w-px bg-[var(--color-border)]" />
+          <ThemeToggle />
           <Link
             href="/institutional"
-            className="px-3 py-1.5 surface-2 hover:border-[var(--color-border-strong)] transition-colors text-[var(--color-text)]"
+            className="btn btn-primary ml-2"
           >
             Institutional
           </Link>
@@ -41,18 +51,19 @@ export function Header() {
   );
 }
 
-function Wordmark() {
+function NavLink({
+  href,
+  children,
+}: {
+  href: "/" | "/framework" | "/api";
+  children: React.ReactNode;
+}) {
   return (
-    <span className="flex items-center gap-2.5">
-      <Image
-        src="/probity-mark.png"
-        alt=""
-        width={28}
-        height={28}
-        priority
-        className="block invert"
-      />
-      <span className="text-lg font-semibold tracking-tight">Probity</span>
-    </span>
+    <Link
+      href={href}
+      className="px-3 py-1.5 rounded-full hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)] transition-colors"
+    >
+      {children}
+    </Link>
   );
 }

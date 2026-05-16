@@ -64,20 +64,25 @@ export default function ApiPage() {
         <h2 className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
           Endpoints — v1
         </h2>
-        <div className="surface divide-y divide-[var(--color-border)]">
+        <div className="surface overflow-hidden divide-y divide-[var(--color-border)]">
           {ENDPOINTS.map((e) => (
             <div
               key={e.path}
-              className="grid grid-cols-[5rem_1fr] md:grid-cols-[5rem_1fr_8rem] gap-4 px-5 py-4 text-sm"
+              className="grid grid-cols-[4.5rem_1fr] md:grid-cols-[4.5rem_1fr_9rem] gap-4 px-5 py-4 text-sm hover:bg-[var(--color-surface-2)] transition-colors"
             >
-              <span className="mono text-xs uppercase tracking-[0.18em] text-[var(--color-text)]">
-                {e.method}
+              <span className="mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-text)] flex items-center">
+                <span
+                  className="px-2 py-0.5 rounded-full border"
+                  style={{ borderColor: "var(--color-border)" }}
+                >
+                  {e.method}
+                </span>
               </span>
               <div className="min-w-0">
                 <p className="mono text-[var(--color-text)] truncate">{e.path}</p>
                 <p className="text-[var(--color-muted)] mt-1">{e.desc}</p>
               </div>
-              <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)] md:text-right">
+              <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] md:text-right self-center">
                 {e.auth}
               </span>
             </div>
@@ -96,10 +101,7 @@ export default function ApiPage() {
       </section>
 
       <div className="mt-10">
-        <Link
-          href="/institutional"
-          className="inline-block px-4 py-2 surface-2 text-sm hover:border-[var(--color-border-strong)] transition-colors"
-        >
+        <Link href="/institutional" className="btn">
           Talk to us about institutional access
         </Link>
       </div>

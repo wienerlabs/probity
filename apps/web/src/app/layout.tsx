@@ -3,6 +3,7 @@ import { Funnel_Display } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { ThemeInit } from "@/components/theme-init";
 
 const funnel = Funnel_Display({
   subsets: ["latin"],
@@ -26,7 +27,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={funnel.variable}>
+    <html lang="en" className={funnel.variable} suppressHydrationWarning>
+      <head>
+        <ThemeInit />
+      </head>
       <body>
         <div className="min-h-screen w-full flex flex-col">
           <Header />

@@ -2,8 +2,11 @@ import Image from "next/image";
 
 export function Footer() {
   return (
-    <footer className="border-t border-[var(--color-border)] mt-24">
-      <div className="container-page py-10 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
+    <footer
+      className="mt-24"
+      style={{ borderTop: "1px solid var(--color-border)" }}
+    >
+      <div className="container-page py-12 grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Image
@@ -11,7 +14,7 @@ export function Footer() {
               alt=""
               width={18}
               height={18}
-              className="invert opacity-70"
+              style={{ filter: "invert(var(--logo-invert))", opacity: 0.7 }}
             />
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)]">
               Probity
@@ -52,7 +55,10 @@ export function Footer() {
         />
       </div>
 
-      <div className="container-page pb-10 flex items-center justify-between text-xs text-[var(--color-muted-2)]">
+      <div
+        className="container-page pb-10 flex items-center justify-between text-xs text-[var(--color-muted-2)]"
+        style={{ borderTop: "1px solid var(--color-border)", paddingTop: "1.5rem" }}
+      >
         <span>© 2026 Wiener Labs · MIT</span>
         <span className="mono">rule_version 0.1.0</span>
       </div>

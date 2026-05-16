@@ -10,7 +10,7 @@ export function CitationList({ citations }: { citations: Citation[] }) {
   return (
     <ul className="space-y-2">
       {citations.map((c, idx) => (
-        <li key={idx} className="surface-2 p-3 text-sm">
+        <li key={idx} className="surface-2 p-3.5 text-sm">
           <Row citation={c} />
         </li>
       ))}
@@ -21,14 +21,14 @@ export function CitationList({ citations }: { citations: Citation[] }) {
 function Row({ citation }: { citation: Citation }) {
   if (citation.type === "onchain") {
     return (
-      <div className="grid grid-cols-[5.5rem_1fr] gap-x-4 gap-y-1">
-        <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+      <div className="grid grid-cols-[5.5rem_1fr] gap-x-4 gap-y-1.5">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
           on-chain
         </span>
         <span className="mono text-[var(--color-text)]">
           {truncateMiddle(citation.account)}
         </span>
-        <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
           field
         </span>
         <span className="text-[var(--color-muted)]">
@@ -36,7 +36,7 @@ function Row({ citation }: { citation: Citation }) {
           <span className="text-[var(--color-text)]">= </span>
           <span className="mono">{citation.value}</span>
         </span>
-        <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
           slot
         </span>
         <span className="mono num text-[var(--color-muted)]">
@@ -47,8 +47,8 @@ function Row({ citation }: { citation: Citation }) {
   }
   if (citation.type === "document") {
     return (
-      <div className="grid grid-cols-[5.5rem_1fr] gap-x-4 gap-y-1">
-        <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+      <div className="grid grid-cols-[5.5rem_1fr] gap-x-4 gap-y-1.5">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
           document
         </span>
         <a
@@ -59,13 +59,13 @@ function Row({ citation }: { citation: Citation }) {
         >
           {citation.sourceUrl}
         </a>
-        <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
           excerpt
         </span>
         <span className="text-[var(--color-muted)] leading-relaxed">
           “{citation.excerpt}”
         </span>
-        <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
           hash
         </span>
         <span className="mono text-[var(--color-muted-2)] text-xs">
@@ -75,12 +75,12 @@ function Row({ citation }: { citation: Citation }) {
     );
   }
   return (
-    <div className="grid grid-cols-[5.5rem_1fr] gap-x-4 gap-y-1">
-      <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+    <div className="grid grid-cols-[5.5rem_1fr] gap-x-4 gap-y-1.5">
+      <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
         derived
       </span>
       <span className="mono text-[var(--color-text)]">{citation.formula}</span>
-      <span className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+      <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
         result
       </span>
       <span className="mono text-[var(--color-muted)]">{citation.result}</span>
