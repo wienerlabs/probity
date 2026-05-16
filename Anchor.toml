@@ -1,0 +1,22 @@
+[features]
+seeds = true
+skip-lint = false
+
+[programs.localnet]
+attestation = "HDpm5Ge4Zryoib6KYHewYoeAXXTE3GMkASZNbSpZZa9U"
+
+[programs.devnet]
+attestation = "HDpm5Ge4Zryoib6KYHewYoeAXXTE3GMkASZNbSpZZa9U"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "pnpm -C programs/attestation test"
+
+[workspace]
+members = ["programs/attestation"]
