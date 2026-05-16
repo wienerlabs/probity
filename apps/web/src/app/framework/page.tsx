@@ -1,4 +1,5 @@
 import { VerdictBadge } from "@/components/verdict-badge";
+import { PROGRAM_REGISTRY, programCountByKind } from "@/lib/solana-registry";
 
 const TESTS = [
   {
@@ -107,6 +108,53 @@ export default function FrameworkPage() {
           . Citation hashes are committed on-chain so a recomputation six
           months later remains comparable to the original record.
         </p>
+      </section>
+
+      <section className="mt-16">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+          On-chain program coverage
+        </h2>
+        <p className="text-[var(--color-muted)] leading-relaxed mb-6">
+          {PROGRAM_REGISTRY.length} well-known Solana programs are classified
+          for revenue attribution. Lending programs paying conventional
+          interest fail the riba rule on material exposure; AMM, staking,
+          and marketplace programs pass.
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-[var(--color-border)] border border-[var(--color-border)]">
+          {Object.entries(programCountByKind())
+            .sort((a, b) => b[1] - a[1])
+            .map(([kind, count]) => (
+              <div key={kind} className="bg-[var(--color-bg)] p-4">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+                  {kind}
+                </p>
+                <p className="mono num text-2xl text-[var(--color-text)] mt-1">
+                  {count}
+                </p>
+              </div>
+            ))}
+        </div>
+        <details className="mt-4 text-sm">
+          <summary className="cursor-pointer text-[var(--color-muted)] hover:text-[var(--color-text)] text-xs uppercase tracking-[0.18em]">
+            View registry
+          </summary>
+          <ul className="mt-3 space-y-1">
+            {PROGRAM_REGISTRY.map((p) => (
+              <li
+                key={p.id}
+                className="flex items-center justify-between gap-3 py-1.5 border-b border-[var(--color-border)] text-xs"
+              >
+                <span className="text-[var(--color-text)]">{p.name}</span>
+                <span className="mono text-[var(--color-muted-2)] truncate">
+                  {p.id}
+                </span>
+                <span className="text-[var(--color-muted)] uppercase tracking-[0.18em]">
+                  {p.kind}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
       </section>
     </div>
   );
