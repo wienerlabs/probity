@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { listDemoKeys } from "@/lib/api/api-keys";
 
 const ENDPOINTS = [
   {
@@ -98,6 +99,61 @@ export default function ApiPage() {
           <span className="text-[var(--color-text)]">X-Probity-Rule-Version</span>{" "}
           declares the rule manifest used. Pin it for reproducibility.
         </p>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-3">
+          Demo keys
+        </h2>
+        <p className="text-[var(--color-muted)] leading-relaxed text-sm mb-4 max-w-2xl">
+          These keys are bundled with the demo build so you can curl the API
+          without onboarding. Real institutional keys are issued through the
+          dashboard and signed with an HMAC secret on the server.
+        </p>
+        <div className="surface overflow-hidden divide-y divide-[var(--color-border)]">
+          {listDemoKeys().map((k) => (
+            <div
+              key={k.key}
+              className="grid grid-cols-[1fr_6rem] md:grid-cols-[1fr_6rem_6rem] gap-4 px-5 py-3.5 text-sm"
+            >
+              <span className="mono text-[var(--color-text)] truncate">
+                {k.key}
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] self-center">
+                tier · {k.tier}
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] self-center md:text-right">
+                owner · {k.owner}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-10 surface p-6">
+        <h2 className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-3">
+          Curl in 30 seconds
+        </h2>
+        <pre
+          className="mono text-xs leading-relaxed overflow-x-auto p-4 rounded-[var(--radius-md)]"
+          style={{
+            background: "var(--color-surface-2)",
+            border: "1px solid var(--color-border)",
+            color: "var(--color-text)",
+          }}
+        >
+{`# Public verdict (no auth)
+curl -s https://probity.wienerlabs.com/api/v1/verdict/UTL | jq .
+
+# Active rule manifest
+curl -s https://probity.wienerlabs.com/api/v1/rules/0.1.0 | jq .
+
+# Batch screen (institutional key)
+curl -s -X POST https://probity.wienerlabs.com/api/v1/batch \\
+  -H "authorization: Bearer probity_demo_growth_key_a1b2c3" \\
+  -H "content-type: application/json" \\
+  -d '{"mints":["UTL","DSTB","LND"]}'`}
+        </pre>
       </section>
 
       <div className="mt-10">
