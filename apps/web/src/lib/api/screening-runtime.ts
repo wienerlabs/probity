@@ -123,7 +123,11 @@ export async function resolveVerdict(
         };
       },
     ),
-    fetchTokenDocuments(state).catch((e) => {
+    fetchTokenDocuments(state, {
+      ...(process.env.BIRDEYE_API_KEY
+        ? { birdeyeApiKey: process.env.BIRDEYE_API_KEY }
+        : {}),
+    }).catch((e) => {
       warnings.push(`Doc fetch failed (${formatErr(e)}); enrichment will run on chain state alone.`);
       return { documents: [], warnings: [] };
     }),

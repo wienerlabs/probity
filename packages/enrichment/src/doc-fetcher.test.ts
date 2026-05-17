@@ -39,9 +39,10 @@ function multiResponder(
 }
 
 describe("fetchTokenDocuments — metadata JSON", () => {
-  it("flags an absent URI and returns no documents", async () => {
+  it("flags an absent URI and returns no documents (fallback disabled)", async () => {
     const out = await fetchTokenDocuments(stateWith(""), {
       fetchImpl: jsonResponder({}),
+      disableFallback: true,
     });
     expect(out.documents).toHaveLength(0);
     expect(out.warnings[0]).toMatch(/Metadata URI absent/);
@@ -58,7 +59,7 @@ describe("fetchTokenDocuments — metadata JSON", () => {
     };
     const out = await fetchTokenDocuments(
       stateWith("ipfs://bafkreitestcid"),
-      { fetchImpl },
+      { fetchImpl, disableFallback: true },
     );
     expect(seen).toContain("https://cloudflare-ipfs.com/ipfs/bafkreitestcid");
     expect(out.documents[0]?.excerpt).toContain("description: ipfs token");
@@ -72,7 +73,7 @@ describe("fetchTokenDocuments — metadata JSON", () => {
     };
     await fetchTokenDocuments(
       stateWith("ar://QPC6FYdUn-3V8ytFNuoCS85S2tHAuiDblh6u3CIZLsw"),
-      { fetchImpl },
+      { fetchImpl, disableFallback: true },
     );
     expect(seen).toBe(
       "https://arweave.net/QPC6FYdUn-3V8ytFNuoCS85S2tHAuiDblh6u3CIZLsw",
@@ -108,6 +109,7 @@ describe("fetchTokenDocuments — metadata JSON", () => {
               ),
           },
         ]),
+        disableFallback: true,
       },
     );
     expect(out.documents).toHaveLength(2);
@@ -133,10 +135,13 @@ describe("fetchTokenDocuments — metadata JSON", () => {
         fetchImpl: jsonResponder({
           description: "lonely token",
         }),
+        disableFallback: true,
       },
     );
     expect(out.documents).toHaveLength(1);
-    expect(out.warnings.some((w) => w.includes("external_url"))).toBe(true);
+    expect(out.warnings.some((w) => w.toLowerCase().includes("homepage"))).toBe(
+      true,
+    );
   });
 
   it("surfaces HTTP errors as warnings, no document added", async () => {
@@ -144,6 +149,7 @@ describe("fetchTokenDocuments — metadata JSON", () => {
       stateWith("https://example.org/meta.json"),
       {
         fetchImpl: async () => new Response("server down", { status: 502 }),
+        disableFallback: true,
       },
     );
     expect(out.documents).toHaveLength(0);
@@ -159,6 +165,7 @@ describe("fetchTokenDocuments — metadata JSON", () => {
             status: 200,
             headers: { "content-type": "text/plain" },
           }),
+        disableFallback: true,
       },
     );
     expect(out.documents).toHaveLength(1);
@@ -173,6 +180,7 @@ describe("fetchTokenDocuments — metadata JSON", () => {
       {
         maxBytesPerDoc: 4_096,
         fetchImpl: async () => new Response(huge, { status: 200 }),
+        disableFallback: true,
       },
     );
     expect(out.documents).toHaveLength(1);

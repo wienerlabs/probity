@@ -16,3 +16,9 @@ export type { DocumentSource, EnrichmentInput, EnrichOptions } from "./enrich";
 
 export { fetchTokenDocuments, htmlToText } from "./doc-fetcher";
 export type { FetchDocsOptions, FetchDocsResult } from "./doc-fetcher";
+
+export { fetchTokenListFallback } from "./token-list-fallback";
+export type {
+  TokenListFallbackOptions,
+  TokenListFallbackResult,
+} from "./token-list-fallback";

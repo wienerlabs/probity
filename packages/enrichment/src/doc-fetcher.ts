@@ -11,6 +11,7 @@
 
 import type { SolanaTokenState } from "@probity/types";
 import type { DocumentSource } from "./enrich";
+import { fetchTokenListFallback } from "./token-list-fallback";
 
 export interface FetchDocsOptions {
   /** Total wall-clock budget across all fetches, milliseconds. */
@@ -19,6 +20,14 @@ export interface FetchDocsOptions {
   maxBytesPerDoc?: number;
   /** Injectable for tests. */
   fetchImpl?: typeof fetch;
+  /**
+   * If set, the Birdeye `token_overview` endpoint is consulted as
+   * a fallback / supplemental source for mints whose on-chain
+   * Metaplex metadata is thin or absent.
+   */
+  birdeyeApiKey?: string;
+  /** Disable the Jupiter v2 + Birdeye fallback path entirely. */
+  disableFallback?: boolean;
 }
 
 export interface FetchDocsResult {
@@ -52,51 +61,70 @@ export async function fetchTokenDocuments(
 
   const documents: DocumentSource[] = [];
   const warnings: string[] = [];
+  let homepageFromMeta: string | null = null;
 
   const uri = sanitizeUrl(state.metadata.uri);
   if (!uri) {
-    warnings.push("Metadata URI absent or unsupported scheme; no off-chain docs ingested.");
-    return { documents, warnings };
+    warnings.push(
+      "Metadata URI absent or unsupported scheme; relying on token-list fallbacks.",
+    );
+  } else {
+    // ---- Step 1: metadata JSON ----
+    const metaUrl = ipfsToHttps(uri);
+    const metaResult = await fetchTextWithCaps(metaUrl, {
+      fetchImpl,
+      maxBytes,
+      timeoutMs: Math.max(1_000, deadline - Date.now()),
+      accept: "application/json, */*",
+    });
+    if ("error" in metaResult) {
+      warnings.push(`Metadata fetch failed (${metaUrl}): ${metaResult.error}`);
+    } else {
+      let meta: MetaplexJson | null = null;
+      try {
+        meta = JSON.parse(metaResult.text) as MetaplexJson;
+      } catch {
+        warnings.push(
+          `Metadata at ${metaUrl} did not parse as JSON; treating as raw text.`,
+        );
+      }
+      const excerpt = buildMetadataExcerpt(meta, metaResult.text, maxBytes);
+      documents.push({
+        kind: "tokenomics",
+        url: metaUrl,
+        excerpt,
+        contentHash: `sha256-len:${metaResult.bytes}`,
+      });
+      if (meta) {
+        homepageFromMeta = sanitizeUrl(
+          meta.external_url ??
+            meta.external_link ??
+            meta.website ??
+            meta.extensions?.website,
+        );
+      }
+    }
   }
 
-  // ---- Step 1: metadata JSON ----
-  const metaUrl = ipfsToHttps(uri);
-  const metaResult = await fetchTextWithCaps(metaUrl, {
-    fetchImpl,
-    maxBytes,
-    timeoutMs: Math.max(1_000, deadline - Date.now()),
-    accept: "application/json, */*",
-  });
-  if ("error" in metaResult) {
-    warnings.push(`Metadata fetch failed (${metaUrl}): ${metaResult.error}`);
-    return { documents, warnings };
+  // ---- Step 2: Jupiter v2 + Birdeye fallback ----
+  // Runs whether or not Metaplex metadata was found. It's never
+  // misleading to surface a token's listing-side description, and
+  // wSOL / USDC / USDT only resolve via this path.
+  let fallbackHomepage: string | null = null;
+  if (!opts.disableFallback && Date.now() < deadline) {
+    const fb = await fetchTokenListFallback(state.mint, {
+      fetchImpl,
+      ...(opts.birdeyeApiKey ? { birdeyeApiKey: opts.birdeyeApiKey } : {}),
+      timeoutMs: Math.max(1_000, deadline - Date.now()),
+      maxBytes,
+    });
+    documents.push(...fb.documents);
+    warnings.push(...fb.warnings);
+    if (fb.links.website) fallbackHomepage = sanitizeUrl(fb.links.website);
   }
 
-  let meta: MetaplexJson | null = null;
-  try {
-    meta = JSON.parse(metaResult.text) as MetaplexJson;
-  } catch {
-    warnings.push(`Metadata at ${metaUrl} did not parse as JSON; treating as raw text.`);
-  }
-
-  const excerpt = buildMetadataExcerpt(meta, metaResult.text, maxBytes);
-  documents.push({
-    kind: "tokenomics",
-    url: metaUrl,
-    excerpt,
-    contentHash: `sha256-len:${metaResult.bytes}`,
-  });
-
-  // ---- Step 2: external_url / homepage ----
-  const homepage = meta
-    ? sanitizeUrl(
-        meta.external_url ??
-          meta.external_link ??
-          meta.website ??
-          meta.extensions?.website,
-      )
-    : null;
-
+  // ---- Step 3: homepage HTML ----
+  const homepage = homepageFromMeta ?? fallbackHomepage;
   if (homepage && Date.now() < deadline) {
     const homeResult = await fetchTextWithCaps(homepage, {
       fetchImpl,
@@ -115,7 +143,9 @@ export async function fetchTokenDocuments(
       });
     }
   } else if (!homepage) {
-    warnings.push("Metadata did not advertise an external_url / website link.");
+    warnings.push(
+      "No homepage URL discovered (Metaplex metadata + token-list fallback both silent).",
+    );
   }
 
   return { documents, warnings };
