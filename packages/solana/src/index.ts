@@ -22,4 +22,20 @@ export {
 export { fetchTokenState } from "./fetch-token-state";
 export type { FetchTokenStateOptions } from "./fetch-token-state";
 
+export { HeliusEnhancedClient } from "./helius-enhanced";
+export type {
+  EnhancedClientOptions,
+  EnhancedTransaction,
+  EnhancedInstruction,
+} from "./helius-enhanced";
+
+export {
+  fetchProgramInteractions,
+  aggregate as aggregateProgramScan,
+} from "./fetch-program-interactions";
+export type {
+  FetchProgramInteractionsOptions,
+  ProgramScanResult,
+} from "./fetch-program-interactions";
+
 export { base58Decode, base58Encode, isLikelyBase58Pubkey } from "./base58";

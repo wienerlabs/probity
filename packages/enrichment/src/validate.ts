@@ -103,6 +103,16 @@ export function parseEnrichmentJson(
   const exposures = exposuresRaw.map((e, i) =>
     parseExposure(e, `revenueModel.exposures[${i}]`, defaultSourceUrl),
   );
+  // Sanity check: revenue shares are *attributions of one revenue line*.
+  // The set may sum to ≤ 1 with the residual implicit; never > 1 + ε.
+  const sum = exposures.reduce((a, e) => a + e.revenueShare, 0);
+  const EPS = 0.01;
+  if (sum > 1 + EPS) {
+    throw new EnrichmentValidationError(
+      `exposures sum to ${sum.toFixed(3)} — must be ≤ 1`,
+      "revenueModel.exposures",
+    );
+  }
   const zeroSumRevenueShare = num01(
     rm.zeroSumRevenueShare ?? 0,
     "revenueModel.zeroSumRevenueShare",

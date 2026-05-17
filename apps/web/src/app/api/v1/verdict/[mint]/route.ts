@@ -44,6 +44,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       enrichment_source: resolved.enrichment_source,
       verdict: resolved.verdict,
       warnings: resolved.warnings ?? [],
+      ...(resolved.evidence ? { evidence: resolved.evidence } : {}),
     };
     return ok(body, {
       headers: {

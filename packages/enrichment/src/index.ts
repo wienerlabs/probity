@@ -13,3 +13,6 @@ export {
 
 export { enrichTokenFromDocs } from "./enrich";
 export type { DocumentSource, EnrichmentInput, EnrichOptions } from "./enrich";
+
+export { fetchTokenDocuments, htmlToText } from "./doc-fetcher";
+export type { FetchDocsOptions, FetchDocsResult } from "./doc-fetcher";

@@ -1,11 +1,37 @@
-// Live-only screening runtime. Every verdict in the app flows through
-// this function — there is no demo / fixture short-circuit. Both
-// HELIUS_API_KEY and ANTHROPIC_API_KEY must be set for screening to
-// run; absence yields a typed error the API layer turns into a 503.
+// Live-only screening runtime. Three real-evidence stages compose the
+// ScreeningContext before the engine runs:
+//
+//   1. Chain ingest        — Helius RPC + DAS getAsset → SolanaTokenState
+//                            (mint authority, freeze, supply, metadata).
+//   2. Program scan        — Helius enhanced transactions API → the
+//                            actual programs touching this mint over
+//                            the last N transactions. This is what
+//                            makes the riba rule non-trivial.
+//   3. Doc fetch + Claude  — Metaplex metadata JSON + external_url
+//                            HTML are fetched (size + timeout capped)
+//                            and handed to Claude as evidence. Claude
+//                            extracts the RevenueModel + GovernanceShape
+//                            under a strict prompt and tight validator.
+//
+// Each stage's failure mode is non-fatal but warning-emitting: a
+// failure in stage 2 simply leaves programInteractions empty (riba
+// rule still pass-by-default but warning is surfaced); a failure in
+// stage 3 is the only stage we hard-fail on, because a screening with
+// no enrichment is not a screening at all.
 
 import { screen } from "@probity/engine";
-import { HeliusClient, fetchTokenState, isLikelyBase58Pubkey } from "@probity/solana";
-import { ClaudeClient, enrichTokenFromDocs } from "@probity/enrichment";
+import {
+  HeliusClient,
+  HeliusEnhancedClient,
+  fetchProgramInteractions,
+  fetchTokenState,
+  isLikelyBase58Pubkey,
+} from "@probity/solana";
+import {
+  ClaudeClient,
+  enrichTokenFromDocs,
+  fetchTokenDocuments,
+} from "@probity/enrichment";
 import type { ScreeningContext, VerdictRecord } from "@probity/types";
 import { getRecentByMint, pushRecent } from "@/lib/screening";
 import { emit } from "./events";
@@ -30,16 +56,19 @@ export interface ResolvedVerdict {
   mint: string;
   source: "live";
   verdict: VerdictRecord;
-  enrichment_source: "claude" | "synthesised";
+  enrichment_source: "claude";
   warnings?: string[];
+  /** Diagnostic counters so the UI can show what real evidence backed the call. */
+  evidence?: {
+    scannedTransactions: number;
+    scannedProgramHits: number;
+    knownPrograms: number;
+    unknownPrograms: number;
+    documentsIngested: number;
+  };
 }
 
 export interface ResolveOptions {
-  /**
-   * When true and we already have a recent verdict for the same
-   * (mint, rule_version), return it instead of re-running the whole
-   * chain. Default false — the API layer opts in.
-   */
   useRecentCache?: boolean;
 }
 
@@ -66,15 +95,46 @@ export async function resolveVerdict(
         mint: hit.verdict.mint,
         source: "live",
         verdict: hit.verdict,
-        enrichment_source: hit.enrichmentSource,
+        enrichment_source: hit.enrichmentSource as "claude",
         warnings: ["Cached verdict from a recent live screening."],
       };
     }
   }
 
+  const warnings: string[] = [];
+
+  // ---- Stage 1: chain state ----
   const helius = new HeliusClient({ apiKey: heliusKey! });
   const state = await fetchTokenState(helius, trimmed);
 
+  // ---- Stage 2 + Stage 3a (parallel): program scan + doc fetch ----
+  const enhanced = new HeliusEnhancedClient({ apiKey: heliusKey! });
+  const [scanResult, docsResult] = await Promise.all([
+    fetchProgramInteractions(enhanced, trimmed, { sampleSize: 50 }).catch(
+      (e) => {
+        warnings.push(
+          `Program scan failed (${formatErr(e)}); riba rule will run against an empty interaction set.`,
+        );
+        return {
+          interactions: [],
+          scannedHits: 0,
+          scannedTransactions: 0,
+          unknownPrograms: [],
+        };
+      },
+    ),
+    fetchTokenDocuments(state).catch((e) => {
+      warnings.push(`Doc fetch failed (${formatErr(e)}); enrichment will run on chain state alone.`);
+      return { documents: [], warnings: [] };
+    }),
+  ]);
+
+  // Merge program scan into state so the engine evaluates against real
+  // observed interactions, not the empty placeholder.
+  state.programInteractions = scanResult.interactions;
+  warnings.push(...docsResult.warnings);
+
+  // ---- Stage 3b: Claude enrichment ----
   const claude = new ClaudeClient({
     apiKey: anthropicKey!,
     ...(process.env.ANTHROPIC_MODEL
@@ -82,10 +142,11 @@ export async function resolveVerdict(
       : {}),
   });
   const enrichment = await enrichTokenFromDocs(
-    { state, documents: [] },
+    { state, documents: docsResult.documents },
     { client: claude },
   );
 
+  // ---- Stage 4: deterministic engine ----
   const ctx: ScreeningContext = {
     mint: state.mint,
     ruleVersion: RULE_VERSION,
@@ -110,8 +171,18 @@ export async function resolveVerdict(
       evidence_hash: verdict.evidenceHash,
       source: "live",
       enrichment_source: "claude",
+      scanned_transactions: scanResult.scannedTransactions,
+      documents_ingested: docsResult.documents.length,
     },
   });
+
+  const evidence = {
+    scannedTransactions: scanResult.scannedTransactions,
+    scannedProgramHits: scanResult.scannedHits,
+    knownPrograms: scanResult.interactions.filter((i) => i.kind !== "other").length,
+    unknownPrograms: scanResult.unknownPrograms.length,
+    documentsIngested: docsResult.documents.length,
+  };
 
   return {
     mint: state.mint,
@@ -119,7 +190,13 @@ export async function resolveVerdict(
     verdict,
     enrichment_source: "claude",
     warnings: [
-      "Live mode: revenue model and governance shape are extracted by Claude from on-chain state alone. Pair with a named-source audit before institutional use.",
+      `Screened ${evidence.scannedTransactions} recent transactions and ${evidence.documentsIngested} off-chain document${evidence.documentsIngested === 1 ? "" : "s"}.`,
+      ...warnings,
     ],
+    evidence,
   };
+}
+
+function formatErr(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
 }
