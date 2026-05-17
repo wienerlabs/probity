@@ -46,8 +46,9 @@ export async function POST(req: NextRequest) {
   const queue: string[] = [...mints];
   const batch = createBatch(key.owner, queue);
 
-  // Kick off processing without blocking the response. The runtime keeps
-  // the process alive for ~30s on Vercel; small batches finish in-band.
+  // Fire-and-forget. The runtime keeps the process alive for ~30s on
+  // Vercel; small batches finish in-band, large ones progress in the
+  // background until the worker is collected.
   void (async () => {
     const concurrency = 8;
     let cursor = 0;
@@ -58,19 +59,12 @@ export async function POST(req: NextRequest) {
         if (!m) continue;
         markItem(batch.id, m, { status: "running" });
         try {
-          const r = await resolveVerdict(m);
-          if (!r) {
-            markItem(batch.id, m, {
-              status: "error",
-              error: "not_found",
-            });
-          } else {
-            markItem(batch.id, m, {
-              status: "done",
-              verdict: r.verdict,
-              source: r.source,
-            });
-          }
+          const r = await resolveVerdict(m, { useRecentCache: true });
+          markItem(batch.id, m, {
+            status: "done",
+            verdict: r.verdict,
+            source: r.source,
+          });
         } catch (e) {
           markItem(batch.id, m, {
             status: "error",

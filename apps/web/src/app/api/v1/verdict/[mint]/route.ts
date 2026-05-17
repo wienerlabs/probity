@@ -3,12 +3,16 @@ import { check, clientIp, RATE_PUBLIC, RATE_API_KEY } from "@/lib/api/rate-limit
 import { authenticate } from "@/lib/api/api-keys";
 import {
   badRequest,
-  notFound,
+  err,
   ok,
   rateLimited,
   serverError,
 } from "@/lib/api/responses";
-import { resolveVerdict } from "@/lib/api/screening-runtime";
+import {
+  InvalidMintError,
+  resolveVerdict,
+  ScreeningConfigError,
+} from "@/lib/api/screening-runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,29 +32,35 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     : check({ key: `ip:${ip}`, ...RATE_PUBLIC });
   if (!rate.allowed) return rateLimited(rate.retryAfterSeconds);
 
-  try {
-    const decoded = decodeURIComponent(mint);
-    const resolved = await resolveVerdict(decoded);
-    if (!resolved) return notFound(`no verdict on file for "${decoded}"`);
+  const useRecentCache = new URL(req.url).searchParams.get("cache") !== "0";
 
+  try {
+    const resolved = await resolveVerdict(decodeURIComponent(mint), {
+      useRecentCache,
+    });
     const body = {
       mint: resolved.mint,
       source: resolved.source,
-      ...(resolved.enrichment_source
-        ? { enrichment_source: resolved.enrichment_source }
-        : {}),
+      enrichment_source: resolved.enrichment_source,
       verdict: resolved.verdict,
       warnings: resolved.warnings ?? [],
     };
-    const headers: Record<string, string> = {
-      "x-probity-source": resolved.source,
-      ...(resolved.enrichment_source
-        ? { "x-probity-enrichment": resolved.enrichment_source }
-        : {}),
-      "x-ratelimit-remaining": String(rate.remaining),
-    };
-    return ok(body, { headers });
+    return ok(body, {
+      headers: {
+        "x-probity-source": resolved.source,
+        "x-probity-enrichment": resolved.enrichment_source,
+        "x-ratelimit-remaining": String(rate.remaining),
+      },
+    });
   } catch (e) {
+    if (e instanceof InvalidMintError) {
+      return badRequest(e.message);
+    }
+    if (e instanceof ScreeningConfigError) {
+      return err(503, "screening_unavailable", e.message, {
+        missing_env: e.missing,
+      });
+    }
     return serverError(e instanceof Error ? e.message : "unknown error");
   }
 }

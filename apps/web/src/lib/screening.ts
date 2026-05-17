@@ -1,54 +1,42 @@
-import { screen } from "@probity/engine";
-import type { VerdictRecord, ScreeningContext } from "@probity/types";
-import { FIXTURES } from "./fixtures";
-import { buildHolderSeries, buildPriceSeries } from "./series";
-import type { HolderSeriesPoint, PriceSeriesPoint } from "./types";
+// In-memory store of recent live verdicts.
+// Module-scoped — resets on cold start. Acceptable for the demo / single
+// instance; durability is a launch gate (M6.5 → Supabase or Upstash).
 
-export interface DemoRecord {
-  context: ScreeningContext;
+import type { ScreeningContext, VerdictRecord } from "@probity/types";
+
+export interface RecentEntry {
   verdict: VerdictRecord;
-  priceSeries: PriceSeriesPoint[];
-  holderSeries: HolderSeriesPoint[];
+  context: ScreeningContext;
+  enrichmentSource: "claude" | "synthesised";
+  pushedAt: string; // ISO
 }
 
-// Computed once at module load. Deterministic: same fixtures + pinned now() →
-// byte-identical verdicts across reloads.
-async function computeAll(): Promise<DemoRecord[]> {
-  const out: DemoRecord[] = [];
-  for (const fx of FIXTURES) {
-    const verdict = await screen(fx.context, {
-      attestationPubkey: fx.attestationPubkey,
-    });
-    out.push({
-      context: fx.context,
-      verdict,
-      priceSeries: buildPriceSeries(
-        fx.seriesSeed,
-        90,
-        fx.priceStart,
-        fx.priceDrift,
-        fx.priceVol,
-      ),
-      holderSeries: buildHolderSeries(
-        fx.seriesSeed,
-        90,
-        fx.holderStart,
-        fx.holderGrowth,
-      ),
-    });
-  }
-  return out;
-}
+const MAX_RECENT = 20;
+const RECENT: RecentEntry[] = [];
 
-export const RECORDS: DemoRecord[] = await computeAll();
-
-export function findRecord(query: string): DemoRecord | undefined {
-  const q = query.trim().toLowerCase();
-  if (!q) return undefined;
-  return RECORDS.find(
-    (r) =>
-      r.verdict.mint.toLowerCase() === q ||
-      r.context.state.metadata.symbol.toLowerCase() === q ||
-      r.context.state.metadata.name.toLowerCase() === q,
+export function pushRecent(entry: Omit<RecentEntry, "pushedAt">): void {
+  // Replace any prior entry for the same mint+rule_version pair —
+  // re-screening the same token should bump, not duplicate.
+  const k = `${entry.verdict.mint}@${entry.verdict.ruleVersion}`;
+  const idx = RECENT.findIndex(
+    (e) => `${e.verdict.mint}@${e.verdict.ruleVersion}` === k,
   );
+  const next: RecentEntry = { ...entry, pushedAt: new Date().toISOString() };
+  if (idx >= 0) {
+    RECENT.splice(idx, 1);
+  }
+  RECENT.unshift(next);
+  while (RECENT.length > MAX_RECENT) RECENT.pop();
+}
+
+export function getRecent(limit = MAX_RECENT): RecentEntry[] {
+  return RECENT.slice(0, limit);
+}
+
+export function getRecentByMint(mint: string): RecentEntry | undefined {
+  return RECENT.find((e) => e.verdict.mint === mint);
+}
+
+export function clearRecent(): void {
+  RECENT.length = 0;
 }

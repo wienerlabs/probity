@@ -2,19 +2,29 @@ import Link from "next/link";
 import { LookupForm } from "@/components/lookup-form";
 import { VerdictCard } from "@/components/verdict-card";
 import { VerdictBadge } from "@/components/verdict-badge";
-import { RECORDS } from "@/lib/screening";
+import { getRecent } from "@/lib/screening";
+
+export const dynamic = "force-dynamic";
+
+const QUICK_EXAMPLES: { mint: string; label: string }[] = [
+  { mint: "So11111111111111111111111111111111111111112", label: "wSOL" },
+  { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", label: "USDC" },
+  { mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", label: "JUP" },
+  { mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", label: "BONK" },
+];
 
 export default function HomePage() {
+  const recent = getRecent();
   const counts = {
-    halal: RECORDS.filter((r) => r.verdict.verdict === "halal").length,
-    mushtabah: RECORDS.filter((r) => r.verdict.verdict === "mushtabah").length,
-    haram: RECORDS.filter((r) => r.verdict.verdict === "haram").length,
+    halal: recent.filter((r) => r.verdict.verdict === "halal").length,
+    mushtabah: recent.filter((r) => r.verdict.verdict === "mushtabah").length,
+    haram: recent.filter((r) => r.verdict.verdict === "haram").length,
   };
 
   return (
     <div className="container-page py-16 md:py-24">
       <section className="max-w-3xl">
-        <span className="chip mb-6">Demo dataset · rule v0.1.0</span>
+        <span className="chip mb-6">Live · rule v0.1.0 · mainnet</span>
         <h1 className="text-4xl md:text-6xl font-light tracking-tight leading-[1.05]">
           The compliance verdict on{" "}
           <span className="font-semibold">every Solana token.</span>
@@ -23,18 +33,25 @@ export default function HomePage() {
           Probity reads each token the way a senior compliance officer would.
           Revenue model, sector exposure, supply mechanics, governance — every
           concern surfaces in a single readable report with a citation trail.
+          Paste any SPL mint; verdicts are computed live from Solana mainnet.
         </p>
 
         <div className="mt-10">
           <LookupForm />
           <p className="mt-4 text-xs text-[var(--color-muted-2)]">
             Try{" "}
-            <TryLink mint="Pr0biTy22222222222222222222222222222222UTL2">UTL</TryLink>
-            ,{" "}
-            <TryLink mint="Pr0biTy11111111111111111111111111111111SOL1">DSTB</TryLink>
-            , or{" "}
-            <TryLink mint="Pr0biTy33333333333333333333333333333333LND3">LND</TryLink>
-            .
+            {QUICK_EXAMPLES.map((e, i) => (
+              <span key={e.mint}>
+                <Link
+                  href={`/verdict/${e.mint}`}
+                  className="mono hover:text-[var(--color-text)] underline-offset-4 hover:underline"
+                >
+                  {e.label}
+                </Link>
+                {i < QUICK_EXAMPLES.length - 1 ? ", " : "."}
+              </span>
+            ))}{" "}
+            Each takes ~10s on first lookup (Helius + Claude pipeline).
           </p>
         </div>
       </section>
@@ -44,7 +61,7 @@ export default function HomePage() {
           label="Halal"
           accent="var(--color-halal)"
           headline={counts.halal.toString()}
-          sub="cleared in screened set"
+          sub="in recent live screenings"
         />
         <Tile
           label="Mushtabah"
@@ -64,14 +81,27 @@ export default function HomePage() {
         <header className="flex items-baseline justify-between mb-6">
           <h2 className="text-xl font-medium">Recently screened</h2>
           <p className="text-xs mono uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
-            {RECORDS.length} tokens · last 24h
+            {recent.length} {recent.length === 1 ? "token" : "tokens"} · live
           </p>
         </header>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {RECORDS.map((r) => (
-            <VerdictCard key={r.verdict.mint} record={r} />
-          ))}
-        </div>
+        {recent.length === 0 ? (
+          <div className="surface p-10 text-center">
+            <p className="text-sm text-[var(--color-muted)] max-w-md mx-auto leading-relaxed">
+              Nothing screened yet. Paste a mint above or try one of the
+              examples — verdicts persist here for this session.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {recent.map((r) => (
+              <VerdictCard
+                key={r.verdict.mint}
+                verdict={r.verdict}
+                context={r.context}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="mt-24 grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -92,17 +122,6 @@ export default function HomePage() {
         />
       </section>
     </div>
-  );
-}
-
-function TryLink({ mint, children }: { mint: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={`/verdict/${mint}`}
-      className="mono hover:text-[var(--color-text)] underline-offset-4 hover:underline"
-    >
-      {children}
-    </Link>
   );
 }
 

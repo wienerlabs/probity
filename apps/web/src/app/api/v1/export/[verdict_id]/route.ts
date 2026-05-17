@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { createHmac } from "node:crypto";
 import { authenticate } from "@/lib/api/api-keys";
 import { notFound, ok, unauthorized } from "@/lib/api/responses";
-import { RECORDS } from "@/lib/screening";
+import { getRecent } from "@/lib/screening";
 
 export const runtime = "nodejs";
 
@@ -23,18 +23,24 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   if (!mint || !ruleVersion) {
     return notFound("verdict_id must be in the form '<mint>@<rule_version>'");
   }
-  const record = RECORDS.find(
-    (r) => r.verdict.mint === mint && r.verdict.ruleVersion === ruleVersion,
+  const entry = getRecent().find(
+    (e) =>
+      e.verdict.mint === mint && e.verdict.ruleVersion === ruleVersion,
   );
-  if (!record) return notFound(`no verdict for ${mint}@${ruleVersion}`);
+  if (!entry) {
+    return notFound(
+      `no recent verdict for ${mint}@${ruleVersion}; re-screen the mint first via /api/v1/verdict/${mint}`,
+    );
+  }
 
   const envelope = {
     issuer: "Probity (Wiener Labs)",
     schema: "probity.audit-export.v1",
     issued_at: new Date().toISOString(),
     issued_to: key.owner,
-    verdict: record.verdict,
-    context: record.context,
+    enrichment_source: entry.enrichmentSource,
+    verdict: entry.verdict,
+    context: entry.context,
   };
   const canonical = JSON.stringify(envelope);
   const sig = createHmac("sha256", HMAC_SECRET).update(canonical).digest("hex");
