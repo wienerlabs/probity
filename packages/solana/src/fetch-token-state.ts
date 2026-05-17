@@ -14,9 +14,15 @@ export async function fetchTokenState(
   mint: string,
   opts: FetchTokenStateOptions = {},
 ): Promise<SolanaTokenState> {
+  // getTokenLargestAccounts can blow up on huge holder sets (USDC etc).
+  // Soft-fail on it — the verdict still computes, holder concentration
+  // just falls back to 0 and is surfaced honestly downstream.
   const [accInfo, largest, asset, slot] = await Promise.all([
     client.rpc.getAccountInfo(mint),
-    client.rpc.getTokenLargestAccounts(mint),
+    client.rpc.getTokenLargestAccounts(mint).catch(() => ({
+      context: { slot: 0 },
+      value: [],
+    })),
     client.getAsset(mint).catch(() => null),
     client.rpc.getSlot(),
   ]);

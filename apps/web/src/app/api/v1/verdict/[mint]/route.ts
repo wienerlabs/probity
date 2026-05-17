@@ -36,11 +36,17 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     const body = {
       mint: resolved.mint,
       source: resolved.source,
+      ...(resolved.enrichment_source
+        ? { enrichment_source: resolved.enrichment_source }
+        : {}),
       verdict: resolved.verdict,
       warnings: resolved.warnings ?? [],
     };
     const headers: Record<string, string> = {
       "x-probity-source": resolved.source,
+      ...(resolved.enrichment_source
+        ? { "x-probity-enrichment": resolved.enrichment_source }
+        : {}),
       "x-ratelimit-remaining": String(rate.remaining),
     };
     return ok(body, { headers });
