@@ -3,11 +3,20 @@
 // instance; durability is a launch gate (M6.5 → Supabase or Upstash).
 
 import type { ScreeningContext, VerdictRecord } from "@probity/types";
+import type { DocumentSource } from "@probity/enrichment";
 
 export interface RecentEntry {
   verdict: VerdictRecord;
   context: ScreeningContext;
   enrichmentSource: "claude" | "synthesised";
+  documents: DocumentSource[];
+  evidence: {
+    scannedTransactions: number;
+    scannedProgramHits: number;
+    knownPrograms: number;
+    unknownPrograms: number;
+    documentsIngested: number;
+  };
   pushedAt: string; // ISO
 }
 

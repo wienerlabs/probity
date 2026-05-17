@@ -33,6 +33,7 @@ import {
   fetchTokenDocuments,
 } from "@probity/enrichment";
 import type { ScreeningContext, VerdictRecord } from "@probity/types";
+import type { DocumentSource } from "@probity/enrichment";
 import { getRecentByMint, pushRecent } from "@/lib/screening";
 import { emit } from "./events";
 
@@ -66,6 +67,8 @@ export interface ResolvedVerdict {
     unknownPrograms: number;
     documentsIngested: number;
   };
+  /** The actual document set Claude was handed. UI surfaces them as a citation list. */
+  documents?: DocumentSource[];
 }
 
 export interface ResolveOptions {
@@ -97,6 +100,8 @@ export async function resolveVerdict(
         verdict: hit.verdict,
         enrichment_source: hit.enrichmentSource as "claude",
         warnings: ["Cached verdict from a recent live screening."],
+        evidence: hit.evidence,
+        documents: hit.documents,
       };
     }
   }
@@ -160,10 +165,20 @@ export async function resolveVerdict(
   };
   const verdict = await screen(ctx);
 
+  const evidence = {
+    scannedTransactions: scanResult.scannedTransactions,
+    scannedProgramHits: scanResult.scannedHits,
+    knownPrograms: scanResult.interactions.filter((i) => i.kind !== "other").length,
+    unknownPrograms: scanResult.unknownPrograms.length,
+    documentsIngested: docsResult.documents.length,
+  };
+
   pushRecent({
     verdict,
     context: ctx,
     enrichmentSource: "claude",
+    documents: docsResult.documents,
+    evidence,
   });
 
   emit({
@@ -180,14 +195,6 @@ export async function resolveVerdict(
     },
   });
 
-  const evidence = {
-    scannedTransactions: scanResult.scannedTransactions,
-    scannedProgramHits: scanResult.scannedHits,
-    knownPrograms: scanResult.interactions.filter((i) => i.kind !== "other").length,
-    unknownPrograms: scanResult.unknownPrograms.length,
-    documentsIngested: docsResult.documents.length,
-  };
-
   return {
     mint: state.mint,
     source: "live",
@@ -198,6 +205,7 @@ export async function resolveVerdict(
       ...warnings,
     ],
     evidence,
+    documents: docsResult.documents,
   };
 }
 

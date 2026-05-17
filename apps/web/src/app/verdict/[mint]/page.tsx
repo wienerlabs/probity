@@ -45,6 +45,22 @@ export default async function VerdictPage({ params }: PageProps) {
           <span className="chip">source · live</span>
           <span className="chip">enrichment · {r.enrichment_source}</span>
           <span className="chip">rule v{verdict.ruleVersion}</span>
+          {r.evidence && (
+            <>
+              <span className="chip">
+                {r.evidence.scannedTransactions} tx scanned
+              </span>
+              <span className="chip">
+                {r.evidence.documentsIngested} doc
+                {r.evidence.documentsIngested === 1 ? "" : "s"} ingested
+              </span>
+              <span className="chip">
+                {r.evidence.knownPrograms +
+                  r.evidence.unknownPrograms}{" "}
+                programs touched
+              </span>
+            </>
+          )}
         </div>
 
         <header className="mt-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -221,6 +237,98 @@ export default async function VerdictPage({ params }: PageProps) {
 
         <section className="mt-12">
           <header className="flex items-baseline justify-between mb-4">
+            <h2 className="text-xl font-medium">Evidence</h2>
+            <p className="text-xs mono uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+              {(r.documents?.length ?? 0)} document
+              {(r.documents?.length ?? 0) === 1 ? "" : "s"} ·{" "}
+              {state.programInteractions.length} programs
+            </p>
+          </header>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="surface p-6">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+                Program scan ({r.evidence?.scannedTransactions ?? 0} tx,{" "}
+                {r.evidence?.scannedProgramHits ?? 0} hits)
+              </p>
+              {state.programInteractions.length === 0 ? (
+                <p className="text-sm text-[var(--color-muted)]">
+                  No non-noise programs observed in the recent transaction
+                  window.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {state.programInteractions.map((p) => (
+                    <li
+                      key={p.program}
+                      className="surface-2 p-3 grid grid-cols-[1fr_auto_auto] gap-3 items-center text-xs"
+                    >
+                      <span className="mono text-[var(--color-text)] truncate">
+                        {truncateMiddle(p.program, 8, 8)}
+                      </span>
+                      <span
+                        className="px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] rounded-full"
+                        style={{
+                          background: kindBg(p.kind),
+                          border: `1px solid ${kindBorder(p.kind)}`,
+                          color: kindColor(p.kind),
+                        }}
+                      >
+                        {p.kind}
+                      </span>
+                      <span className="mono num text-[var(--color-muted)]">
+                        {(p.primaryRevenueShare * 100).toFixed(1)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="surface p-6">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+                Documents handed to Claude
+              </p>
+              {!r.documents || r.documents.length === 0 ? (
+                <p className="text-sm text-[var(--color-muted)]">
+                  No off-chain documents were ingested for this mint.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {r.documents.map((d, i) => (
+                    <li key={i} className="surface-2 p-3 text-xs space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] rounded-full"
+                          style={{
+                            background: "var(--color-surface)",
+                            border: "1px solid var(--color-border)",
+                            color: "var(--color-muted)",
+                          }}
+                        >
+                          {d.kind}
+                        </span>
+                        <a
+                          href={d.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mono text-[var(--color-text)] truncate hover:underline"
+                        >
+                          {d.url}
+                        </a>
+                      </div>
+                      <p className="text-[var(--color-muted)] whitespace-pre-line break-words">
+                        {d.excerpt.slice(0, 280)}
+                        {d.excerpt.length > 280 ? "…" : ""}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-12">
+          <header className="flex items-baseline justify-between mb-4">
             <h2 className="text-xl font-medium">Rule outcomes</h2>
             <p className="text-xs mono uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
               {verdict.outcomes.length} rules ·{" "}
@@ -372,4 +480,25 @@ function Govern({ label, value }: { label: string; value: string }) {
 function authStatus(pubkey: string | null): string {
   if (pubkey === null) return "renounced";
   return truncateMiddle(pubkey, 5, 5);
+}
+
+// Program-kind palette. Lending-interest-bearing → haram-tinted, AMM /
+// marketplace / staking / governance → muted utility tone, unknown → grey.
+function kindColor(kind: string): string {
+  if (kind === "lending-interest-bearing") return "var(--color-haram)";
+  if (kind === "amm-swap" || kind === "marketplace") return "var(--color-halal)";
+  if (kind === "staking" || kind === "governance" || kind === "lending-collateral-only")
+    return "var(--color-muted)";
+  return "var(--color-muted-2)";
+}
+function kindBg(kind: string): string {
+  if (kind === "lending-interest-bearing") return "var(--color-haram-bg)";
+  if (kind === "amm-swap" || kind === "marketplace") return "var(--color-halal-bg)";
+  return "var(--color-surface-2)";
+}
+function kindBorder(kind: string): string {
+  if (kind === "lending-interest-bearing") return "var(--color-haram-border)";
+  if (kind === "amm-swap" || kind === "marketplace")
+    return "var(--color-halal-border)";
+  return "var(--color-border)";
 }
