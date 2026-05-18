@@ -107,4 +107,28 @@ export function getChanges(mint: string, limit = 25): VerdictChangeRow[] {
   return repo().changesForMint(mint, limit);
 }
 
+export function getRecentChanges(limit = 25): VerdictChangeRow[] {
+  return repo().recentChangesAcrossMints(limit);
+}
+
+export function getStats() {
+  return repo().stats();
+}
+
+export function getSectorAggregates(limit = 50) {
+  return repo().aggregateSectorExposures(limit);
+}
+
+export function getProgramAggregates(limit = 50) {
+  return repo().aggregateProgramInteractions(limit);
+}
+
+export function getProgramKindAggregates(limit = 50) {
+  return repo().aggregateProgramKinds(limit);
+}
+
+export function getConsensusTrend(mint: string, limit = 25): number[] {
+  return repo().consensusTrendForMint(mint, limit);
+}
+
 export type { VerdictDiff };

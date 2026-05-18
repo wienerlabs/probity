@@ -4,12 +4,24 @@ import {
   InvalidMintError,
   ScreeningConfigError,
 } from "@/lib/api/screening-runtime";
-import { getChanges, getHistory, getRecentByMint } from "@/lib/screening";
+import {
+  getChanges,
+  getConsensusTrend,
+  getHistory,
+  getRecentByMint,
+} from "@/lib/screening";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { RuleTable } from "@/components/rule-table";
-import { ScoreBars } from "@/components/score-bars";
 import { LookupForm } from "@/components/lookup-form";
 import { formatPercent, formatRelative, truncateMiddle } from "@/lib/format";
+import {
+  Donut,
+  Gauge,
+  HorizontalBars,
+  Radar,
+  Sparkline,
+  StatCard,
+} from "@/components/charts";
 import type { SolanaTokenState } from "@probity/types";
 
 interface PageProps {
@@ -33,6 +45,10 @@ export default async function VerdictPage({ params }: PageProps) {
     const meta = state.metadata;
     const history = getHistory(verdict.mint, 25);
     const changes = getChanges(verdict.mint, 15);
+    const consensusTrend = getConsensusTrend(verdict.mint, 25);
+    const topHolders = state.topHolders.slice(0, 10);
+    const programKindCounts = aggregateKindCounts(state.programInteractions);
+    const exposures = cached?.context.enrichment.revenueModel.exposures ?? [];
 
     return (
       <div className="container-page py-12 md:py-16">
@@ -129,84 +145,189 @@ export default async function VerdictPage({ params }: PageProps) {
           />
         </section>
 
-        <section className="mt-10 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
-          <div className="surface p-7 flex flex-col gap-4">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)]">
-                Revenue model
-              </p>
-              <p className="mt-2 mono text-sm text-[var(--color-text)]">
-                {cached?.context.enrichment.revenueModel.primary ?? "—"}
-              </p>
+        <section className="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="surface p-6 flex flex-col items-center justify-center">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] self-start">
+              Score profile
+            </p>
+            <Radar
+              axes={[
+                { label: "riba", value: verdict.scoreBreakdown.riba },
+                { label: "maysir", value: verdict.scoreBreakdown.maysir },
+                { label: "gharar", value: verdict.scoreBreakdown.gharar },
+                { label: "sector", value: verdict.scoreBreakdown.sector },
+                { label: "governance", value: verdict.scoreBreakdown.governance },
+                { label: "transparency", value: verdict.scoreBreakdown.transparency },
+              ]}
+              size={280}
+              color={verdict.verdict === "halal" ? "var(--color-halal)" : verdict.verdict === "mushtabah" ? "var(--color-mushtabah)" : "var(--color-haram)"}
+              threshold={{ label: "material floor", value: 0.5 }}
+            />
+          </div>
+          <div className="surface p-6 flex flex-col">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+              Program kinds touched
+            </p>
+            <div className="flex-1 flex items-center">
+              <Donut
+                segments={programKindCounts}
+                size={170}
+                thickness={20}
+                centerLabel={state.programInteractions.length.toString()}
+                centerSub="programs"
+              />
             </div>
-            <div className="grid grid-cols-1 gap-2">
-              {(cached?.context.enrichment.revenueModel.exposures ?? []).map(
-                (ex, i) => (
-                  <div
-                    key={i}
-                    className="surface-2 p-3 grid grid-cols-[1fr_auto] gap-3 items-center text-sm"
-                  >
-                    <span className="text-[var(--color-text)]">{ex.tag}</span>
-                    <span className="mono num text-xs text-[var(--color-muted)]">
-                      {(ex.revenueShare * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                ),
-              )}
-              {(cached?.context.enrichment.revenueModel.exposures ?? []).length ===
-                0 && (
-                <p className="text-sm text-[var(--color-muted)]">
-                  No revenue exposures recorded.
-                </p>
-              )}
-            </div>
-            <div className="mt-2 pt-4" style={{ borderTop: "1px solid var(--color-border)" }}>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)]">
-                Governance
+          </div>
+          <div className="surface p-6 flex flex-col items-center justify-center">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] self-start">
+              Consensus confidence
+            </p>
+            {r.consensus ? (
+              <Gauge
+                value={r.consensus.confidence}
+                size={220}
+                label={`${r.consensus.runs}× claude`}
+                sub={`primary agreement ${(r.consensus.primaryAgreement * 100).toFixed(0)}%`}
+              />
+            ) : (
+              <p className="text-sm text-[var(--color-muted)] py-12">
+                Consensus disabled (single run).
               </p>
-              <dl className="mt-3 grid grid-cols-2 gap-3 text-xs">
-                <Govern
-                  label="Timelock"
-                  value={
-                    cached?.context.enrichment.governance.timelockSeconds
-                      ? `${cached.context.enrichment.governance.timelockSeconds}s`
-                      : "none"
-                  }
-                />
-                <Govern
-                  label="Multisig"
-                  value={
-                    cached?.context.enrichment.governance.multisigThreshold
-                      ? `${cached.context.enrichment.governance.multisigThreshold.m}-of-${cached.context.enrichment.governance.multisigThreshold.n}`
-                      : "none"
-                  }
-                />
-                <Govern
-                  label="Utility score"
-                  value={
-                    cached
-                      ? cached.context.enrichment.revenueModel.utilityScore.toFixed(
-                          2,
-                        )
-                      : "—"
-                  }
-                />
-                <Govern
-                  label="Zero-sum revenue"
-                  value={
-                    cached
-                      ? `${(cached.context.enrichment.revenueModel.zeroSumRevenueShare * 100).toFixed(1)}%`
-                      : "—"
-                  }
-                />
-              </dl>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="surface p-6">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+              Sector exposures · Claude extraction
+            </p>
+            <p className="mono text-sm text-[var(--color-text)] mb-4">
+              {cached?.context.enrichment.revenueModel.primary ?? "—"}
+            </p>
+            <HorizontalBars
+              rows={exposures.map((ex) => ({
+                label: ex.tag,
+                value: ex.revenueShare,
+                color: HARAM_TAGS.includes(ex.tag)
+                  ? "var(--color-haram)"
+                  : ex.tag === "primary-utility" || ex.tag === "infra"
+                    ? "var(--color-halal)"
+                    : "var(--color-mushtabah)",
+                trailingLabel: HARAM_TAGS.includes(ex.tag) ? "haram" : undefined,
+              }))}
+              max={1}
+              format={(v) => `${(v * 100).toFixed(1)}%`}
+              emptyLabel="No sector exposures emitted."
+            />
+            <div
+              className="mt-5 pt-4 grid grid-cols-2 gap-3 text-xs"
+              style={{ borderTop: "1px solid var(--color-border)" }}
+            >
+              <Govern
+                label="Utility score"
+                value={
+                  cached
+                    ? cached.context.enrichment.revenueModel.utilityScore.toFixed(2)
+                    : "—"
+                }
+              />
+              <Govern
+                label="Zero-sum share"
+                value={
+                  cached
+                    ? `${(cached.context.enrichment.revenueModel.zeroSumRevenueShare * 100).toFixed(1)}%`
+                    : "—"
+                }
+              />
+              <Govern
+                label="Timelock"
+                value={
+                  cached?.context.enrichment.governance.timelockSeconds
+                    ? `${cached.context.enrichment.governance.timelockSeconds}s`
+                    : "none"
+                }
+              />
+              <Govern
+                label="Multisig"
+                value={
+                  cached?.context.enrichment.governance.multisigThreshold
+                    ? `${cached.context.enrichment.governance.multisigThreshold.m}-of-${cached.context.enrichment.governance.multisigThreshold.n}`
+                    : "none"
+                }
+              />
             </div>
           </div>
           <div className="surface p-6">
             <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
-              Score breakdown
+              Top 10 holders · concentration
             </p>
-            <ScoreBars scores={verdict.scoreBreakdown} />
+            <HorizontalBars
+              rows={topHolders.map((h, i) => ({
+                label: `#${i + 1} ${truncateMiddle(h.address, 6, 6)}`,
+                value: h.share,
+                color: h.share > 0.2 ? "var(--color-haram)" : h.share > 0.1 ? "var(--color-mushtabah)" : "var(--color-halal)",
+              }))}
+              max={Math.max(0.01, topHolders[0]?.share ?? 0.01)}
+              format={(v) => `${(v * 100).toFixed(2)}%`}
+              emptyLabel="getTokenLargestAccounts unavailable for this mint."
+            />
+            <div
+              className="mt-5 pt-4 grid grid-cols-3 gap-3 text-xs"
+              style={{ borderTop: "1px solid var(--color-border)" }}
+            >
+              <Govern
+                label="Top 10 share"
+                value={formatPercent(state.topHolderConcentration)}
+              />
+              <Govern
+                label="Holders sampled"
+                value={String(topHolders.length)}
+              />
+              <Govern label="Snapshot" value={state.snapshotSlot.toLocaleString()} />
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-5 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
+          <div className="surface p-6">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+              Consensus confidence trend
+            </p>
+            <div className="flex items-end gap-4">
+              <Sparkline
+                values={consensusTrend.length ? consensusTrend : [r.consensus?.confidence ?? 0.5]}
+                width={420}
+                height={84}
+                strokeWidth={2}
+                color={verdict.verdict === "halal" ? "var(--color-halal)" : verdict.verdict === "mushtabah" ? "var(--color-mushtabah)" : "var(--color-haram)"}
+                fill="var(--color-text)"
+                showDots
+              />
+              <div className="text-xs space-y-1">
+                <p className="text-[var(--color-muted-2)] uppercase tracking-[0.18em] text-[10px]">
+                  samples
+                </p>
+                <p className="mono num text-[var(--color-text)] text-lg">
+                  {consensusTrend.length || 1}
+                </p>
+                {consensusTrend.length > 0 && (
+                  <>
+                    <p className="text-[var(--color-muted-2)] uppercase tracking-[0.18em] text-[10px] mt-2">
+                      min / max
+                    </p>
+                    <p className="mono num text-[var(--color-muted)]">
+                      {Math.min(...consensusTrend).toFixed(2)} / {Math.max(...consensusTrend).toFixed(2)}
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="surface p-6">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+              Verdict metadata
+            </p>
             <Divider />
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
@@ -779,6 +900,42 @@ function ConfidenceChip({ confidence, runs }: { confidence: number; runs: number
       consensus · {label} · {confidence.toFixed(2)} ({runs}×)
     </span>
   );
+}
+
+const HARAM_TAGS = [
+  "alcohol",
+  "gambling",
+  "adult",
+  "tobacco",
+  "weapons",
+  "conventional-finance",
+  "pork",
+  "lending-interest",
+];
+
+function aggregateKindCounts(
+  interactions: SolanaTokenState["programInteractions"],
+): Array<{ label: string; value: number; color: string }> {
+  const acc = new Map<string, number>();
+  for (const p of interactions) {
+    acc.set(p.kind, (acc.get(p.kind) ?? 0) + 1);
+  }
+  const palette: Record<string, string> = {
+    "amm-swap": "var(--color-halal)",
+    marketplace: "var(--color-halal)",
+    staking: "var(--color-muted)",
+    governance: "var(--color-text)",
+    "lending-interest-bearing": "var(--color-haram)",
+    "lending-collateral-only": "var(--color-mushtabah)",
+    other: "var(--color-muted-2)",
+  };
+  return [...acc.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([kind, n]) => ({
+      label: kind,
+      value: n,
+      color: palette[kind] ?? "var(--color-muted-2)",
+    }));
 }
 
 function kindColor(kind: string): string {

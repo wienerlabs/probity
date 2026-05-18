@@ -197,6 +197,151 @@ export class VerdictRepository {
     return rows.map(hydrate);
   }
 
+  aggregateSectorExposures(limit = 50): Array<{ tag: string; total_share: number; mentions: number }> {
+    const rows = this.db
+      .prepare(
+        `SELECT context_json FROM verdicts
+         WHERE id IN (SELECT MAX(id) FROM verdicts GROUP BY mint)
+         ORDER BY computed_at DESC LIMIT ?`,
+      )
+      .all(limit) as unknown as Array<{ context_json: string }>;
+    const acc = new Map<string, { tag: string; total_share: number; mentions: number }>();
+    for (const r of rows) {
+      const ctx = JSON.parse(r.context_json) as ScreeningContext;
+      const exposures = ctx?.enrichment?.revenueModel?.exposures ?? [];
+      for (const ex of exposures) {
+        const cur = acc.get(ex.tag) ?? { tag: ex.tag, total_share: 0, mentions: 0 };
+        cur.total_share += ex.revenueShare;
+        cur.mentions += 1;
+        acc.set(ex.tag, cur);
+      }
+    }
+    return [...acc.values()].sort((a, b) => b.total_share - a.total_share);
+  }
+
+  aggregateProgramInteractions(limit = 50): Array<{ program: string; kind: string; mentions: number; total_share: number }> {
+    const rows = this.db
+      .prepare(
+        `SELECT context_json FROM verdicts
+         WHERE id IN (SELECT MAX(id) FROM verdicts GROUP BY mint)
+         ORDER BY computed_at DESC LIMIT ?`,
+      )
+      .all(limit) as unknown as Array<{ context_json: string }>;
+    const acc = new Map<string, { program: string; kind: string; mentions: number; total_share: number }>();
+    for (const r of rows) {
+      const ctx = JSON.parse(r.context_json) as ScreeningContext;
+      for (const p of ctx?.state?.programInteractions ?? []) {
+        const cur = acc.get(p.program) ?? {
+          program: p.program,
+          kind: p.kind,
+          mentions: 0,
+          total_share: 0,
+        };
+        cur.mentions += 1;
+        cur.total_share += p.primaryRevenueShare;
+        cur.kind = p.kind;
+        acc.set(p.program, cur);
+      }
+    }
+    return [...acc.values()].sort((a, b) => b.mentions - a.mentions);
+  }
+
+  aggregateProgramKinds(limit = 50): Array<{ kind: string; mentions: number; total_share: number }> {
+    const all = this.aggregateProgramInteractions(limit);
+    const acc = new Map<string, { kind: string; mentions: number; total_share: number }>();
+    for (const p of all) {
+      const cur = acc.get(p.kind) ?? { kind: p.kind, mentions: 0, total_share: 0 };
+      cur.mentions += p.mentions;
+      cur.total_share += p.total_share;
+      acc.set(p.kind, cur);
+    }
+    return [...acc.values()].sort((a, b) => b.mentions - a.mentions);
+  }
+
+  recentChangesAcrossMints(limit = 25): VerdictChangeRow[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM verdict_changes ORDER BY detected_at DESC LIMIT ?`,
+      )
+      .all(limit) as unknown as Array<{
+      id: number;
+      mint: string;
+      previous_verdict_id: number | null;
+      new_verdict_id: number;
+      previous_verdict: VerdictRecord["verdict"] | null;
+      new_verdict: VerdictRecord["verdict"];
+      diff_json: string;
+      detected_at: string;
+    }>;
+    return rows.map((r) => ({
+      id: r.id,
+      mint: r.mint,
+      previousVerdictId: r.previous_verdict_id,
+      newVerdictId: r.new_verdict_id,
+      previousVerdict: r.previous_verdict,
+      newVerdict: r.new_verdict,
+      diff: JSON.parse(r.diff_json) as VerdictDiff,
+      detectedAt: r.detected_at,
+    }));
+  }
+
+  stats(): {
+    totalVerdicts: number;
+    uniqueMints: number;
+    last24hScans: number;
+    avgConsensusConfidence: number | null;
+    totalChanges: number;
+    avgScannedTransactions: number;
+    totalDocumentsIngested: number;
+  } {
+    const total = (this.db
+      .prepare("SELECT COUNT(*) AS n FROM verdicts")
+      .get() as unknown as { n: number }).n;
+    const unique = (this.db
+      .prepare("SELECT COUNT(DISTINCT mint) AS n FROM verdicts")
+      .get() as unknown as { n: number }).n;
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const last24 = (this.db
+      .prepare("SELECT COUNT(*) AS n FROM verdicts WHERE computed_at > ?")
+      .get(since) as unknown as { n: number }).n;
+    const avgRow = this.db
+      .prepare(
+        `SELECT AVG(consensus_confidence) AS avg_c,
+                AVG(scanned_transactions) AS avg_tx,
+                SUM(documents_ingested) AS total_docs
+         FROM verdicts
+         WHERE id IN (SELECT MAX(id) FROM verdicts GROUP BY mint)`,
+      )
+      .get() as unknown as {
+      avg_c: number | null;
+      avg_tx: number | null;
+      total_docs: number | null;
+    };
+    const totalChanges = (this.db
+      .prepare("SELECT COUNT(*) AS n FROM verdict_changes")
+      .get() as unknown as { n: number }).n;
+    return {
+      totalVerdicts: total,
+      uniqueMints: unique,
+      last24hScans: last24,
+      avgConsensusConfidence: avgRow.avg_c,
+      totalChanges,
+      avgScannedTransactions: avgRow.avg_tx ?? 0,
+      totalDocumentsIngested: avgRow.total_docs ?? 0,
+    };
+  }
+
+  consensusTrendForMint(mint: string, limit = 25): number[] {
+    const rows = this.db
+      .prepare(
+        `SELECT consensus_confidence FROM verdicts
+         WHERE mint = ? AND consensus_confidence IS NOT NULL
+         ORDER BY computed_at ASC LIMIT ?`,
+      )
+      .all(mint, limit) as unknown as Array<{ consensus_confidence: number }>;
+    return rows.map((r) => r.consensus_confidence);
+  }
+
   countByVerdict(): Record<VerdictRecord["verdict"], number> {
     const rows = this.db
       .prepare(
