@@ -200,12 +200,13 @@ export async function resolveVerdict(
     documentsIngested: docsResult.documents.length,
   };
 
-  pushRecent({
+  const push = pushRecent({
     verdict,
     context: ctx,
     enrichmentSource: "claude",
     documents: docsResult.documents,
     evidence,
+    ...(consensus ? { consensus } : {}),
   });
 
   emit({
@@ -219,8 +220,29 @@ export async function resolveVerdict(
       enrichment_source: "claude",
       scanned_transactions: scanResult.scannedTransactions,
       documents_ingested: docsResult.documents.length,
+      ...(consensus ? { consensus_confidence: consensus.confidence } : {}),
     },
   });
+
+  if (push.changed && push.diff && push.previousVerdict) {
+    emit({
+      event: "verdict.changed",
+      data: {
+        mint: state.mint,
+        previous_verdict: push.previousVerdict,
+        next_verdict: verdict.verdict,
+        rule_version: verdict.ruleVersion,
+        evidence_hash: verdict.evidenceHash,
+        outcome_deltas: push.diff.outcomeDeltas,
+        score_deltas: push.diff.scoreDeltas,
+        new_citations: push.diff.newCitations,
+        removed_citations: push.diff.removedCitations,
+      },
+    });
+    warnings.push(
+      `Verdict moved from ${push.previousVerdict} to ${verdict.verdict} since the last screening.`,
+    );
+  }
 
   return {
     mint: state.mint,

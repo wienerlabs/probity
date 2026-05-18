@@ -4,7 +4,7 @@ import {
   InvalidMintError,
   ScreeningConfigError,
 } from "@/lib/api/screening-runtime";
-import { getRecentByMint } from "@/lib/screening";
+import { getChanges, getHistory, getRecentByMint } from "@/lib/screening";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { RuleTable } from "@/components/rule-table";
 import { ScoreBars } from "@/components/score-bars";
@@ -31,6 +31,8 @@ export default async function VerdictPage({ params }: PageProps) {
     const cached = getRecentByMint(verdict.mint);
     const state: SolanaTokenState = cached?.context.state ?? minimalState(verdict.mint);
     const meta = state.metadata;
+    const history = getHistory(verdict.mint, 25);
+    const changes = getChanges(verdict.mint, 15);
 
     return (
       <div className="container-page py-12 md:py-16">
@@ -460,6 +462,136 @@ export default async function VerdictPage({ params }: PageProps) {
             </div>
           </div>
         </section>
+
+        {history.length > 1 && (
+          <section className="mt-12">
+            <header className="flex items-baseline justify-between mb-4">
+              <h2 className="text-xl font-medium">History</h2>
+              <p className="text-xs mono uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+                {history.length} screening{history.length === 1 ? "" : "s"} · {changes.length}{" "}
+                change{changes.length === 1 ? "" : "s"}
+              </p>
+            </header>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="surface p-6">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+                  Timeline · latest first
+                </p>
+                <ul className="space-y-2">
+                  {history.map((h, idx) => (
+                    <li
+                      key={`${h.verdict.evidenceHash}-${idx}`}
+                      className="surface-2 p-3 grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 text-xs"
+                    >
+                      <VerdictBadge verdict={h.verdict.verdict} size="sm" />
+                      <span className="mono text-[var(--color-muted)] truncate">
+                        {h.verdict.evidenceHash.replace("sha256:", "")
+                          .slice(0, 12)}…
+                      </span>
+                      <span
+                        className="mono num text-[var(--color-muted-2)]"
+                        title={`utility ${h.verdict.scoreBreakdown.riba.toFixed(2)} riba / ${h.verdict.scoreBreakdown.sector.toFixed(2)} sector`}
+                      >
+                        c{h.consensus?.confidence !== undefined ? h.consensus.confidence.toFixed(2) : "—"}
+                      </span>
+                      <span className="text-[var(--color-muted-2)] text-right">
+                        {formatRelative(h.verdict.computedAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="surface p-6">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+                  Changes detected
+                </p>
+                {changes.length === 0 ? (
+                  <p className="text-sm text-[var(--color-muted)]">
+                    No verdict deltas across recorded screenings.
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {changes.map((c) => (
+                      <li key={c.id} className="surface-2 p-3 text-xs space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {c.previousVerdict && (
+                            <>
+                              <VerdictBadge verdict={c.previousVerdict} size="sm" />
+                              <span
+                                aria-hidden
+                                className="text-[var(--color-muted-2)]"
+                              >
+                                →
+                              </span>
+                            </>
+                          )}
+                          <VerdictBadge verdict={c.newVerdict} size="sm" />
+                          <span className="text-[var(--color-muted-2)] ml-auto">
+                            {formatRelative(c.detectedAt)}
+                          </span>
+                        </div>
+                        {c.diff.outcomeDeltas.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] mb-1">
+                              outcome deltas
+                            </p>
+                            <ul className="space-y-1">
+                              {c.diff.outcomeDeltas.map((d, i) => (
+                                <li key={i} className="mono text-[var(--color-muted)]">
+                                  {d.ruleId} :{" "}
+                                  <span className="text-[var(--color-haram)]">
+                                    {d.previous ?? "∅"}
+                                  </span>{" "}
+                                  →{" "}
+                                  <span className="text-[var(--color-halal)]">
+                                    {d.next}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {c.diff.scoreDeltas.length > 0 && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] mb-1">
+                              score deltas
+                            </p>
+                            <ul className="space-y-1">
+                              {c.diff.scoreDeltas.map((s, i) => (
+                                <li key={i} className="mono text-[var(--color-muted)]">
+                                  {s.axis}: {s.previous?.toFixed(2) ?? "—"} →{" "}
+                                  {s.next.toFixed(2)}{" "}
+                                  <span
+                                    style={{
+                                      color:
+                                        s.delta >= 0
+                                          ? "var(--color-halal)"
+                                          : "var(--color-haram)",
+                                    }}
+                                  >
+                                    ({s.delta >= 0 ? "+" : ""}
+                                    {s.delta.toFixed(2)})
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {(c.diff.newCitations > 0 ||
+                          c.diff.removedCitations > 0) && (
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+                            citations: +{c.diff.newCitations} new ·{" "}
+                            −{c.diff.removedCitations} removed
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="mt-12">
           <header className="flex items-baseline justify-between mb-4">

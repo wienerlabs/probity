@@ -1,15 +1,25 @@
-// In-memory store of recent live verdicts.
-// Module-scoped — resets on cold start. Acceptable for the demo / single
-// instance; durability is a launch gate (M6.5 → Supabase or Upstash).
-
+import {
+  VerdictRepository,
+  sharedDb,
+  type PersistedRow,
+  type VerdictChangeRow,
+  type VerdictDiff,
+} from "@probity/storage";
 import type { ScreeningContext, VerdictRecord } from "@probity/types";
-import type { DocumentSource } from "@probity/enrichment";
+import type { DocumentSource, ConsensusReport } from "@probity/enrichment";
+
+let REPO: VerdictRepository | null = null;
+function repo(): VerdictRepository {
+  if (!REPO) REPO = new VerdictRepository(sharedDb());
+  return REPO;
+}
 
 export interface RecentEntry {
   verdict: VerdictRecord;
   context: ScreeningContext;
   enrichmentSource: "claude" | "synthesised";
   documents: DocumentSource[];
+  consensus?: ConsensusReport;
   evidence: {
     scannedTransactions: number;
     scannedProgramHits: number;
@@ -17,35 +27,84 @@ export interface RecentEntry {
     unknownPrograms: number;
     documentsIngested: number;
   };
-  pushedAt: string; // ISO
+  pushedAt: string;
 }
 
-const MAX_RECENT = 20;
-const RECENT: RecentEntry[] = [];
+export interface PushResult {
+  id: number;
+  changed: boolean;
+  diff?: VerdictDiff;
+  previousVerdict?: VerdictRecord["verdict"];
+}
 
-export function pushRecent(entry: Omit<RecentEntry, "pushedAt">): void {
-  // Replace any prior entry for the same mint+rule_version pair —
-  // re-screening the same token should bump, not duplicate.
-  const k = `${entry.verdict.mint}@${entry.verdict.ruleVersion}`;
-  const idx = RECENT.findIndex(
-    (e) => `${e.verdict.mint}@${e.verdict.ruleVersion}` === k,
-  );
-  const next: RecentEntry = { ...entry, pushedAt: new Date().toISOString() };
-  if (idx >= 0) {
-    RECENT.splice(idx, 1);
+export function pushRecent(
+  entry: Omit<RecentEntry, "pushedAt">,
+): PushResult {
+  const result = repo().persist({
+    context: entry.context,
+    verdict: entry.verdict,
+    documents: entry.documents,
+    warnings: [],
+    evidence: entry.evidence,
+    enrichmentSource: entry.enrichmentSource,
+    ...(entry.consensus ? { consensus: entry.consensus } : {}),
+  });
+  if (result.changed && result.previousId !== null) {
+    const changes = repo().changesForMint(entry.verdict.mint, 1);
+    const latest = changes[0];
+    if (latest) {
+      return {
+        id: result.id,
+        changed: true,
+        diff: latest.diff,
+        ...(latest.previousVerdict
+          ? { previousVerdict: latest.previousVerdict }
+          : {}),
+      };
+    }
   }
-  RECENT.unshift(next);
-  while (RECENT.length > MAX_RECENT) RECENT.pop();
+  return { id: result.id, changed: result.changed };
 }
 
-export function getRecent(limit = MAX_RECENT): RecentEntry[] {
-  return RECENT.slice(0, limit);
+function rowToRecent(r: PersistedRow): RecentEntry {
+  return {
+    verdict: r.verdictRecord,
+    context: r.context,
+    enrichmentSource: r.enrichmentSource as RecentEntry["enrichmentSource"],
+    documents: r.documents as DocumentSource[],
+    ...(r.consensus
+      ? { consensus: r.consensus as ConsensusReport }
+      : {}),
+    evidence: {
+      scannedTransactions: r.scannedTransactions,
+      scannedProgramHits: r.scannedProgramHits,
+      knownPrograms: r.knownPrograms,
+      unknownPrograms: r.unknownPrograms,
+      documentsIngested: r.documentsIngested,
+    },
+    pushedAt: r.computedAt,
+  };
+}
+
+export function getRecent(limit = 20): RecentEntry[] {
+  return repo().listRecent(limit).map(rowToRecent);
 }
 
 export function getRecentByMint(mint: string): RecentEntry | undefined {
-  return RECENT.find((e) => e.verdict.mint === mint);
+  const row = repo().latestForMint(mint);
+  return row ? rowToRecent(row) : undefined;
 }
 
-export function clearRecent(): void {
-  RECENT.length = 0;
+export function getHistory(mint: string, limit = 25): RecentEntry[] {
+  return repo().historyForMint(mint, limit).map(rowToRecent);
 }
+
+export function countByVerdict() {
+  return repo().countByVerdict();
+}
+
+export function getChanges(mint: string, limit = 25): VerdictChangeRow[] {
+  return repo().changesForMint(mint, limit);
+}
+
+export type { VerdictDiff };

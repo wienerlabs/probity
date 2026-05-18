@@ -43,3 +43,9 @@ test-ledger/
 
 # misc
 *.local
+
+# SQLite verdict store
+data/
+*.db
+*.db-wal
+*.db-shm

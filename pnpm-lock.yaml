@@ -29,6 +29,9 @@ importers:
       '@probity/solana':
         specifier: workspace:*
         version: link:../../packages/solana
+      '@probity/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@probity/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -107,6 +110,19 @@ importers:
         version: 5.9.3
 
   packages/solana:
+    dependencies:
+      '@probity/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.4(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)
+
+  packages/storage:
     dependencies:
       '@probity/types':
         specifier: workspace:*
