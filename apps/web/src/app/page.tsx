@@ -5,10 +5,12 @@ import { VerdictBadge } from "@/components/verdict-badge";
 import {
   getProgramKindAggregates,
   getRecent,
+  getRecentByMint,
   getRecentChanges,
   getSectorAggregates,
   getStats,
 } from "@/lib/screening";
+import { TokenAvatar } from "@/components/token-avatar";
 import {
   Donut,
   HorizontalBars,
@@ -254,35 +256,61 @@ export default function HomePage() {
             </p>
           ) : (
             <ul className="space-y-2.5">
-              {recentChanges.map((c) => (
-                <li
-                  key={c.id}
-                  className="surface-2 p-3.5 grid grid-cols-[1fr_auto] gap-3 items-center text-xs"
-                >
-                  <div className="min-w-0">
-                    <Link
-                      href={`/verdict/${c.mint}`}
-                      className="mono text-[var(--color-text)] hover:underline truncate block"
-                    >
-                      {truncateMiddle(c.mint, 9, 9)}
-                    </Link>
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      {c.previousVerdict && (
-                        <>
-                          <VerdictBadge verdict={c.previousVerdict} size="sm" />
-                          <span aria-hidden className="text-[var(--color-muted-2)]">
-                            →
+              {recentChanges.map((c) => {
+                const cachedRow = getRecentByMint(c.mint);
+                const m = cachedRow?.context.state.metadata;
+                return (
+                  <li
+                    key={c.id}
+                    className="surface-2 p-3.5 grid grid-cols-[auto_1fr_auto] gap-3 items-center text-xs"
+                  >
+                    <TokenAvatar
+                      logoUrl={m?.logoUrl}
+                      symbol={m?.symbol}
+                      name={m?.name}
+                      mint={c.mint}
+                      size={36}
+                      verdictTint={c.newVerdict}
+                      ring
+                    />
+                    <div className="min-w-0">
+                      <Link
+                        href={`/verdict/${c.mint}`}
+                        className="text-[var(--color-text)] hover:underline truncate block"
+                      >
+                        <span className="font-medium">
+                          {m?.symbol || truncateMiddle(c.mint, 6, 6)}
+                        </span>
+                        {m?.name && (
+                          <span className="text-[var(--color-muted)] ml-2">
+                            {m.name}
                           </span>
-                        </>
-                      )}
-                      <VerdictBadge verdict={c.newVerdict} size="sm" />
+                        )}
+                      </Link>
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        {c.previousVerdict && (
+                          <>
+                            <VerdictBadge
+                              verdict={c.previousVerdict}
+                              size="sm"
+                            />
+                            <span
+                              aria-hidden
+                              className="text-[var(--color-muted-2)]"
+                            >
+                              →
+                            </span>
+                          </>
+                        )}
+                        <VerdictBadge verdict={c.newVerdict} size="sm" />
+                      </div>
                     </div>
-                  </div>
-                  <span className="text-[var(--color-muted-2)] text-right text-[11px]">
-                    {formatRelative(c.detectedAt)}
-                  </span>
-                </li>
-              ))}
+                    <span className="text-[var(--color-muted-2)] text-right text-[11px]">
+                      {formatRelative(c.detectedAt)}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

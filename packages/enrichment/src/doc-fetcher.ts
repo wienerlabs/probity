@@ -38,6 +38,13 @@ export interface FetchDocsOptions {
 export interface FetchDocsResult {
   documents: DocumentSource[];
   warnings: string[];
+  links: {
+    website?: string;
+    twitter?: string;
+    github?: string;
+    logo?: string;
+    coingeckoId?: string;
+  };
 }
 
 const DEFAULT_BUDGET_MS = 8_000;
@@ -66,7 +73,10 @@ export async function fetchTokenDocuments(
 
   const documents: DocumentSource[] = [];
   const warnings: string[] = [];
+  const aggregateLinks: FetchDocsResult["links"] = {};
   let homepageFromMeta: string | null = null;
+  let logoFromMeta: string | null = null;
+  let twitterFromMeta: string | null = null;
 
   const uri = sanitizeUrl(state.metadata.uri);
   if (!uri) {
@@ -107,6 +117,10 @@ export async function fetchTokenDocuments(
             meta.website ??
             meta.extensions?.website,
         );
+        const metaImage = (meta as unknown as { image?: string }).image;
+        if (metaImage) logoFromMeta = sanitizeUrl(metaImage);
+        if (meta.extensions?.twitter)
+          twitterFromMeta = sanitizeUrl(meta.extensions.twitter);
       }
     }
   }
@@ -139,7 +153,25 @@ export async function fetchTokenDocuments(
     if (tl.links.website) fallbackHomepage = sanitizeUrl(tl.links.website);
     if (!fallbackHomepage && cg.links.homepage)
       fallbackHomepage = sanitizeUrl(cg.links.homepage);
+
+    const w = aggregateLinks.website ?? tl.links.website ?? cg.links.homepage;
+    const t = aggregateLinks.twitter ?? tl.links.twitter ?? cg.links.twitter;
+    const g = aggregateLinks.github ?? tl.links.github ?? cg.links.github;
+    const l = aggregateLinks.logo ?? tl.links.logo ?? cg.links.logo;
+    const cgId =
+      aggregateLinks.coingeckoId ?? tl.links.coingeckoId ?? cg.links.coingeckoId;
+    if (w) aggregateLinks.website = w;
+    if (t) aggregateLinks.twitter = t;
+    if (g) aggregateLinks.github = g;
+    if (l) aggregateLinks.logo = l;
+    if (cgId) aggregateLinks.coingeckoId = cgId;
   }
+  if (homepageFromMeta && !aggregateLinks.website)
+    aggregateLinks.website = homepageFromMeta;
+  if (twitterFromMeta && !aggregateLinks.twitter)
+    aggregateLinks.twitter = twitterFromMeta;
+  if (logoFromMeta && !aggregateLinks.logo)
+    aggregateLinks.logo = logoFromMeta;
 
   // ---- Step 3: homepage HTML ----
   const homepage = homepageFromMeta ?? fallbackHomepage;
@@ -166,7 +198,7 @@ export async function fetchTokenDocuments(
     );
   }
 
-  return { documents, warnings };
+  return { documents, warnings, links: aggregateLinks };
 }
 
 // ----------------- helpers -----------------

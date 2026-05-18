@@ -140,7 +140,17 @@ export async function resolveVerdict(
         : {}),
     }).catch((e) => {
       warnings.push(`Doc fetch failed (${formatErr(e)}); enrichment will run on chain state alone.`);
-      return { documents: [], warnings: [] };
+      return {
+        documents: [] as DocumentSource[],
+        warnings: [] as string[],
+        links: {} as {
+          website?: string;
+          twitter?: string;
+          github?: string;
+          logo?: string;
+          coingeckoId?: string;
+        },
+      };
     }),
   ]);
 
@@ -148,6 +158,15 @@ export async function resolveVerdict(
   // observed interactions, not the empty placeholder.
   state.programInteractions = scanResult.interactions;
   warnings.push(...docsResult.warnings);
+
+  // Helius logoUrl already on state.metadata.logoUrl. Fallback to whatever
+  // Jupiter / Birdeye / CoinGecko surfaced; same for website + socials.
+  const lnk = docsResult.links;
+  if (!state.metadata.logoUrl && lnk.logo) state.metadata.logoUrl = lnk.logo;
+  if (lnk.website) state.metadata.website = lnk.website;
+  if (lnk.twitter) state.metadata.twitter = lnk.twitter;
+  if (lnk.github) state.metadata.github = lnk.github;
+  if (lnk.coingeckoId) state.metadata.coingeckoId = lnk.coingeckoId;
 
   // ---- Stage 3b: Claude enrichment with 3-run consensus ----
   const claude = new ClaudeClient({

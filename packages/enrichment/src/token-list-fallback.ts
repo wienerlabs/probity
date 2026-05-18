@@ -24,8 +24,14 @@ export interface TokenListFallbackOptions {
 export interface TokenListFallbackResult {
   documents: DocumentSource[];
   warnings: string[];
-  /** URLs discovered (website / twitter) the caller can fetch further. */
-  links: { website?: string; twitter?: string; github?: string };
+  /** URLs discovered (website / twitter / etc) the caller can fetch further. */
+  links: {
+    website?: string;
+    twitter?: string;
+    github?: string;
+    logo?: string;
+    coingeckoId?: string;
+  };
 }
 
 const DEFAULT_TIMEOUT_MS = 4_000;
@@ -38,6 +44,7 @@ interface JupV2Token {
   id?: string;
   name?: string;
   symbol?: string;
+  icon?: string;
   decimals?: number;
   isVerified?: boolean;
   twitter?: string;
@@ -68,6 +75,8 @@ interface BirdeyeOverview {
     symbol?: string;
     description?: string | null;
     website?: string | null;
+    logoURI?: string | null;
+    logoUri?: string | null;
     extensions?: {
       description?: string;
       website?: string;
@@ -92,7 +101,13 @@ export async function fetchTokenListFallback(
 
   const documents: DocumentSource[] = [];
   const warnings: string[] = [];
-  const links: { website?: string; twitter?: string; github?: string } = {};
+  const links: {
+    website?: string;
+    twitter?: string;
+    github?: string;
+    logo?: string;
+    coingeckoId?: string;
+  } = {};
 
   // ---- Jupiter v2 search ----
   const jupUrl = `${JUP_BASE}?query=${encodeURIComponent(mint)}`;
@@ -110,6 +125,7 @@ export async function fetchTokenListFallback(
     if (match) {
       if (match.website) links.website = match.website;
       if (match.twitter) links.twitter = match.twitter;
+      if (match.icon) links.logo = match.icon;
       documents.push({
         kind: "tokenomics",
         url: jupUrl,
@@ -142,9 +158,13 @@ export async function fetchTokenListFallback(
         const website = d.website || d.extensions?.website;
         const twitter = d.extensions?.twitter;
         const github = d.extensions?.github;
+        const logo = (d.logoURI || d.logoUri) ?? undefined;
+        const cg = d.extensions?.coingeckoId;
         if (website && !links.website) links.website = website;
         if (twitter && !links.twitter) links.twitter = twitter;
         if (github) links.github = github;
+        if (logo && !links.logo) links.logo = logo;
+        if (cg) links.coingeckoId = cg;
         documents.push({
           kind: "tokenomics",
           url: birdUrl,

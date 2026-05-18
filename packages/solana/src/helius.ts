@@ -18,6 +18,11 @@ export interface HeliusAsset {
     metadata: { name?: string; symbol?: string; description?: string };
     json_uri?: string;
     links?: Record<string, string>;
+    files?: Array<{
+      uri?: string;
+      cdn_uri?: string;
+      mime?: string;
+    }>;
   };
   authorities: Array<{ address: string; scopes: string[] }>;
   mutable: boolean;

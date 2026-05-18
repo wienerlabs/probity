@@ -65,6 +65,11 @@ export interface TokenMetadata {
   symbol: string;
   uri: string;
   isMutable: boolean;
+  logoUrl?: string;
+  website?: string;
+  twitter?: string;
+  github?: string;
+  coingeckoId?: string;
 }
 
 export interface Token2022Extension {

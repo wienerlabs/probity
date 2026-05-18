@@ -13,6 +13,7 @@ import {
 import { VerdictBadge } from "@/components/verdict-badge";
 import { RuleTable } from "@/components/rule-table";
 import { LookupForm } from "@/components/lookup-form";
+import { TokenAvatar } from "@/components/token-avatar";
 import { formatPercent, formatRelative, truncateMiddle } from "@/lib/format";
 import {
   Donut,
@@ -87,20 +88,88 @@ export default async function VerdictPage({ params }: PageProps) {
           )}
         </div>
 
-        <header className="mt-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)]">
-              {meta.symbol || "—"} · {meta.name || "unnamed token"}
-            </p>
-            <h1 className="mt-2 text-3xl md:text-5xl font-light tracking-tight">
-              <span className="font-semibold capitalize">{verdict.verdict}</span>{" "}
-              <span className="text-[var(--color-muted)]">
-                under rule v{verdict.ruleVersion}
-              </span>
-            </h1>
-            <p className="mt-3 mono text-sm text-[var(--color-muted)] break-all">
-              {verdict.mint}
-            </p>
+        <header className="mt-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-5 min-w-0">
+            <TokenAvatar
+              logoUrl={meta.logoUrl}
+              symbol={meta.symbol}
+              name={meta.name}
+              mint={verdict.mint}
+              size={88}
+              ring
+              verdictTint={verdict.verdict}
+            />
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)]">
+                {meta.symbol || "—"} · {meta.name || "unnamed token"}
+              </p>
+              <h1 className="mt-2 text-3xl md:text-5xl font-light tracking-tight">
+                <span className="font-semibold capitalize">
+                  {verdict.verdict}
+                </span>{" "}
+                <span className="text-[var(--color-muted)]">
+                  under rule v{verdict.ruleVersion}
+                </span>
+              </h1>
+              <p className="mt-3 mono text-sm text-[var(--color-muted)] break-all">
+                {verdict.mint}
+              </p>
+              {(meta.website ||
+                meta.twitter ||
+                meta.github ||
+                meta.coingeckoId) && (
+                <ul className="mt-3 flex items-center gap-2 flex-wrap text-[10px] uppercase tracking-[0.18em]">
+                  {meta.website && (
+                    <li>
+                      <a
+                        href={meta.website}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="chip hover:text-[var(--color-text)] transition-colors"
+                      >
+                        site
+                      </a>
+                    </li>
+                  )}
+                  {meta.twitter && (
+                    <li>
+                      <a
+                        href={meta.twitter}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="chip hover:text-[var(--color-text)] transition-colors"
+                      >
+                        twitter
+                      </a>
+                    </li>
+                  )}
+                  {meta.github && (
+                    <li>
+                      <a
+                        href={meta.github}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="chip hover:text-[var(--color-text)] transition-colors"
+                      >
+                        github
+                      </a>
+                    </li>
+                  )}
+                  {meta.coingeckoId && (
+                    <li>
+                      <a
+                        href={`https://www.coingecko.com/en/coins/${meta.coingeckoId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="chip hover:text-[var(--color-text)] transition-colors"
+                      >
+                        coingecko
+                      </a>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
           </div>
           <VerdictBadge verdict={verdict.verdict} size="lg" glow />
         </header>

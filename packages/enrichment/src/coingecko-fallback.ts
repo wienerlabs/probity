@@ -17,6 +17,7 @@ interface CGCoin {
   community_score?: number;
   liquidity_score?: number;
   public_interest_score?: number;
+  image?: { thumb?: string; small?: string; large?: string };
   links?: {
     homepage?: string[];
     blockchain_site?: string[];
@@ -64,6 +65,8 @@ export interface CoingeckoFallbackResult {
     twitter?: string;
     github?: string;
     subreddit?: string;
+    logo?: string;
+    coingeckoId?: string;
   };
   categories: string[];
   marketCapRank?: number;
@@ -163,6 +166,9 @@ export async function fetchCoingeckoFallback(
     if (coin.links?.subreddit_url) links.subreddit = coin.links.subreddit_url;
     const repos = coin.links?.repos_url?.github ?? [];
     if (repos[0]) links.github = repos[0];
+    const cgLogo = coin.image?.large || coin.image?.small || coin.image?.thumb;
+    if (cgLogo) links.logo = cgLogo;
+    if (coin.id) links.coingeckoId = coin.id;
 
     const excerpt = buildExcerpt(coin, categories, marketCapRank, trustScore);
     documents.push({

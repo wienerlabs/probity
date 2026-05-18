@@ -87,6 +87,7 @@ export async function fetchTokenState(
     ? buildProgramInteractions(opts.programInteractions)
     : [];
 
+  const logoUrl = extractLogoFromAsset(asset);
   const state: SolanaTokenState = {
     mint,
     decimals,
@@ -98,6 +99,7 @@ export async function fetchTokenState(
       symbol: asset?.content.metadata.symbol ?? "",
       uri: asset?.content.json_uri ?? "",
       isMutable: asset?.mutable ?? true,
+      ...(logoUrl ? { logoUrl } : {}),
     },
     metadataAccount,
     topHolderConcentration: concentration,
@@ -108,6 +110,33 @@ export async function fetchTokenState(
   };
   if (extensions.length > 0) state.extensions = extensions;
   return state;
+}
+
+interface AssetWithMedia {
+  content?: {
+    links?: { image?: string };
+    files?: Array<{ uri?: string; cdn_uri?: string; mime?: string }>;
+  };
+}
+
+function extractLogoFromAsset(asset: unknown): string | null {
+  if (!asset) return null;
+  const a = asset as AssetWithMedia;
+  const image = a.content?.links?.image?.trim();
+  if (image && isProbableImageUrl(image)) return image;
+  for (const f of a.content?.files ?? []) {
+    const cdn = f.cdn_uri?.trim();
+    if (cdn && isProbableImageUrl(cdn)) return cdn;
+    const uri = f.uri?.trim();
+    if (uri && isProbableImageUrl(uri)) return uri;
+  }
+  return null;
+}
+
+function isProbableImageUrl(u: string): boolean {
+  if (!/^https?:\/\//i.test(u) && !u.startsWith("ipfs://") && !u.startsWith("ar://"))
+    return false;
+  return true;
 }
 
 function toExtensionRecord(e: ParsedExtension): Token2022Extension {
