@@ -12,6 +12,7 @@
 import type { SolanaTokenState } from "@probity/types";
 import type { DocumentSource } from "./enrich";
 import { fetchTokenListFallback } from "./token-list-fallback";
+import { fetchCoingeckoFallback } from "./coingecko-fallback";
 
 export interface FetchDocsOptions {
   /** Total wall-clock budget across all fetches, milliseconds. */
@@ -26,7 +27,11 @@ export interface FetchDocsOptions {
    * Metaplex metadata is thin or absent.
    */
   birdeyeApiKey?: string;
-  /** Disable the Jupiter v2 + Birdeye fallback path entirely. */
+  /** CoinGecko demo / pro API key. CoinGecko works keyless on the
+   * public tier but with very low rate limits; passing a key enables
+   * the demo tier which is enough for screening pipelines. */
+  coingeckoApiKey?: string;
+  /** Disable the Jupiter v2 + Birdeye + CoinGecko fallback path entirely. */
   disableFallback?: boolean;
 }
 
@@ -106,21 +111,34 @@ export async function fetchTokenDocuments(
     }
   }
 
-  // ---- Step 2: Jupiter v2 + Birdeye fallback ----
+  // ---- Step 2: Jupiter v2 + Birdeye + CoinGecko fallback ----
   // Runs whether or not Metaplex metadata was found. It's never
   // misleading to surface a token's listing-side description, and
   // wSOL / USDC / USDT only resolve via this path.
   let fallbackHomepage: string | null = null;
   if (!opts.disableFallback && Date.now() < deadline) {
-    const fb = await fetchTokenListFallback(state.mint, {
-      fetchImpl,
-      ...(opts.birdeyeApiKey ? { birdeyeApiKey: opts.birdeyeApiKey } : {}),
-      timeoutMs: Math.max(1_000, deadline - Date.now()),
-      maxBytes,
-    });
-    documents.push(...fb.documents);
-    warnings.push(...fb.warnings);
-    if (fb.links.website) fallbackHomepage = sanitizeUrl(fb.links.website);
+    const remaining = () => Math.max(1_000, deadline - Date.now());
+    const [tl, cg] = await Promise.all([
+      fetchTokenListFallback(state.mint, {
+        fetchImpl,
+        ...(opts.birdeyeApiKey ? { birdeyeApiKey: opts.birdeyeApiKey } : {}),
+        timeoutMs: remaining(),
+        maxBytes,
+      }),
+      fetchCoingeckoFallback(state.mint, {
+        fetchImpl,
+        ...(opts.coingeckoApiKey ? { apiKey: opts.coingeckoApiKey } : {}),
+        timeoutMs: remaining(),
+        maxBytes: Math.max(maxBytes, 384 * 1024),
+      }),
+    ]);
+    documents.push(...tl.documents);
+    warnings.push(...tl.warnings);
+    documents.push(...cg.documents);
+    warnings.push(...cg.warnings);
+    if (tl.links.website) fallbackHomepage = sanitizeUrl(tl.links.website);
+    if (!fallbackHomepage && cg.links.homepage)
+      fallbackHomepage = sanitizeUrl(cg.links.homepage);
   }
 
   // ---- Step 3: homepage HTML ----

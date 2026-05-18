@@ -22,3 +22,12 @@ export type {
   TokenListFallbackOptions,
   TokenListFallbackResult,
 } from "./token-list-fallback";
+
+export {
+  fetchCoingeckoFallback,
+  classifyCategoryHints,
+} from "./coingecko-fallback";
+export type {
+  CoingeckoFallbackOptions,
+  CoingeckoFallbackResult,
+} from "./coingecko-fallback";
