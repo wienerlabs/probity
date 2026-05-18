@@ -30,10 +30,11 @@ import {
 import {
   ClaudeClient,
   enrichTokenFromDocs,
+  enrichWithConsensus,
   fetchTokenDocuments,
 } from "@probity/enrichment";
 import type { ScreeningContext, VerdictRecord } from "@probity/types";
-import type { DocumentSource } from "@probity/enrichment";
+import type { ConsensusReport, DocumentSource } from "@probity/enrichment";
 import { getRecentByMint, pushRecent } from "@/lib/screening";
 import { emit } from "./events";
 
@@ -69,6 +70,8 @@ export interface ResolvedVerdict {
   };
   /** The actual document set Claude was handed. UI surfaces them as a citation list. */
   documents?: DocumentSource[];
+  /** Cross-run consensus report when 3x enrichment was run. */
+  consensus?: ConsensusReport;
 }
 
 export interface ResolveOptions {
@@ -146,17 +149,38 @@ export async function resolveVerdict(
   state.programInteractions = scanResult.interactions;
   warnings.push(...docsResult.warnings);
 
-  // ---- Stage 3b: Claude enrichment ----
+  // ---- Stage 3b: Claude enrichment with 3-run consensus ----
   const claude = new ClaudeClient({
     apiKey: anthropicKey!,
     ...(process.env.ANTHROPIC_MODEL
       ? { model: process.env.ANTHROPIC_MODEL }
       : {}),
   });
-  const enrichment = await enrichTokenFromDocs(
-    { state, documents: docsResult.documents },
-    { client: claude },
-  );
+  const runsEnv = Number(process.env.PROBITY_ENRICHMENT_RUNS ?? "3");
+  const runs = Math.max(1, Math.min(5, Number.isFinite(runsEnv) ? runsEnv : 3));
+  let enrichment;
+  let consensus: ConsensusReport | undefined;
+  if (runs === 1) {
+    enrichment = await enrichTokenFromDocs(
+      { state, documents: docsResult.documents },
+      { client: claude },
+    );
+  } else {
+    const result = await enrichWithConsensus(
+      { state, documents: docsResult.documents },
+      { client: claude, runs },
+    );
+    enrichment = result.bundle;
+    consensus = result.report;
+    if (consensus.confidence < 0.7) {
+      warnings.push(
+        `Low cross-run confidence ${consensus.confidence.toFixed(2)}; verdict carries higher uncertainty than usual.`,
+      );
+    }
+    if (consensus.warnings.length > 0) {
+      warnings.push(...consensus.warnings);
+    }
+  }
 
   // ---- Stage 4: deterministic engine ----
   const ctx: ScreeningContext = {
@@ -204,11 +228,12 @@ export async function resolveVerdict(
     verdict,
     enrichment_source: "claude",
     warnings: [
-      `Screened ${evidence.scannedTransactions} recent transactions and ${evidence.documentsIngested} off-chain document${evidence.documentsIngested === 1 ? "" : "s"}.`,
+      `Screened ${evidence.scannedTransactions} recent transactions and ${evidence.documentsIngested} off-chain document${evidence.documentsIngested === 1 ? "" : "s"}${consensus ? ` across ${consensus.runs} consensus runs (confidence ${consensus.confidence.toFixed(2)})` : ""}.`,
       ...warnings,
     ],
     evidence,
     documents: docsResult.documents,
+    ...(consensus ? { consensus } : {}),
   };
 }
 

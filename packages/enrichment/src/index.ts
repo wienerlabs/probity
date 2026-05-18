@@ -31,3 +31,16 @@ export type {
   CoingeckoFallbackOptions,
   CoingeckoFallbackResult,
 } from "./coingecko-fallback";
+
+export {
+  enrichWithConsensus,
+  summariseConsensus,
+  confidenceLabel,
+} from "./consensus";
+export type {
+  ConsensusOptions,
+  ConsensusReport,
+  ConsensusResult,
+  SectorAgreement,
+  GovernanceAgreement,
+} from "./consensus";

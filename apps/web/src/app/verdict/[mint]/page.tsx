@@ -61,6 +61,12 @@ export default async function VerdictPage({ params }: PageProps) {
               </span>
             </>
           )}
+          {r.consensus && (
+            <ConfidenceChip
+              confidence={r.consensus.confidence}
+              runs={r.consensus.runs}
+            />
+          )}
         </div>
 
         <header className="mt-6 flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -234,6 +240,134 @@ export default async function VerdictPage({ params }: PageProps) {
             </p>
           </div>
         </section>
+
+        {r.consensus && (
+          <section className="mt-12">
+            <header className="flex items-baseline justify-between mb-4">
+              <h2 className="text-xl font-medium">Cross-run consensus</h2>
+              <p className="text-xs mono uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+                {r.consensus.runs}× Claude · confidence {r.consensus.confidence.toFixed(2)}
+              </p>
+            </header>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="surface p-6">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+                  Sector exposure agreement
+                </p>
+                {r.consensus.sectorAgreements.length === 0 ? (
+                  <p className="text-sm text-[var(--color-muted)]">
+                    No sector exposures emitted in any run.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {r.consensus.sectorAgreements.map((s) => (
+                      <li
+                        key={s.tag}
+                        className="surface-2 p-3 grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center text-xs"
+                      >
+                        <span className="text-[var(--color-text)]">{s.tag}</span>
+                        <span
+                          className="px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] rounded-full border text-[var(--color-muted)]"
+                          style={{ borderColor: "var(--color-border)" }}
+                        >
+                          {s.occurrences}/{r.consensus!.runs}
+                        </span>
+                        <span className="mono num text-[var(--color-muted)]">
+                          med {(s.shareMedian * 100).toFixed(1)}%
+                        </span>
+                        <span
+                          className="mono num text-[var(--color-muted-2)]"
+                          title={`min ${(s.shareMin * 100).toFixed(1)}% / max ${(s.shareMax * 100).toFixed(1)}%`}
+                        >
+                          σ {(s.shareStddev * 100).toFixed(1)}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div
+                  className="mt-5 pt-4"
+                  style={{ borderTop: "1px solid var(--color-border)" }}
+                >
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <Govern
+                      label="Utility score"
+                      value={`med ${r.consensus.utilityScoreMedian.toFixed(2)} · σ ${r.consensus.utilityScoreStddev.toFixed(2)}`}
+                    />
+                    <Govern
+                      label="Zero-sum share"
+                      value={`med ${(r.consensus.zeroSumMedian * 100).toFixed(1)}% · σ ${(r.consensus.zeroSumStddev * 100).toFixed(1)}%`}
+                    />
+                    <Govern
+                      label="Primary label agreement"
+                      value={`${(r.consensus.primaryAgreement * 100).toFixed(0)}%`}
+                    />
+                    <Govern
+                      label="Runs"
+                      value={String(r.consensus.runs)}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="surface p-6">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-4">
+                  Governance agreement across runs
+                </p>
+                <ul className="space-y-2">
+                  {r.consensus.governanceAgreements.map((g) => (
+                    <li
+                      key={g.field}
+                      className="surface-2 p-3 text-xs space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="mono text-[var(--color-text)]">
+                          {g.field}
+                        </span>
+                        <span
+                          className="px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] rounded-full border"
+                          style={{
+                            borderColor:
+                              g.agreement >= 0.85
+                                ? "var(--color-halal-border)"
+                                : g.agreement >= 0.6
+                                  ? "var(--color-mushtabah-border)"
+                                  : "var(--color-haram-border)",
+                            color:
+                              g.agreement >= 0.85
+                                ? "var(--color-halal)"
+                                : g.agreement >= 0.6
+                                  ? "var(--color-mushtabah)"
+                                  : "var(--color-haram)",
+                          }}
+                        >
+                          {(g.agreement * 100).toFixed(0)}% agree
+                        </span>
+                      </div>
+                      <p className="text-[var(--color-muted)] mono break-words">
+                        {g.values.join(" │ ")}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                {r.consensus.warnings.length > 0 && (
+                  <div
+                    className="mt-5 pt-4"
+                    style={{ borderTop: "1px solid var(--color-border)" }}
+                  >
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-2">
+                      Consensus warnings
+                    </p>
+                    <ul className="space-y-1 text-xs text-[var(--color-muted)]">
+                      {r.consensus.warnings.map((w, i) => (
+                        <li key={i}>· {w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="mt-12">
           <header className="flex items-baseline justify-between mb-4">
@@ -484,6 +618,37 @@ function authStatus(pubkey: string | null): string {
 
 // Program-kind palette. Lending-interest-bearing → haram-tinted, AMM /
 // marketplace / staking / governance → muted utility tone, unknown → grey.
+function ConfidenceChip({ confidence, runs }: { confidence: number; runs: number }) {
+  let color = "var(--color-halal)";
+  let bg = "var(--color-halal-bg)";
+  let border = "var(--color-halal-border)";
+  let label = "high";
+  if (confidence < 0.65) {
+    color = "var(--color-haram)";
+    bg = "var(--color-haram-bg)";
+    border = "var(--color-haram-border)";
+    label = "low";
+  } else if (confidence < 0.85) {
+    color = "var(--color-mushtabah)";
+    bg = "var(--color-mushtabah-bg)";
+    border = "var(--color-mushtabah-border)";
+    label = "medium";
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] rounded-full font-medium"
+      style={{ background: bg, border: `1px solid ${border}`, color }}
+    >
+      <span
+        aria-hidden
+        className="inline-block w-1.5 h-1.5 rounded-full"
+        style={{ background: color, boxShadow: `0 0 6px ${color}` }}
+      />
+      consensus · {label} · {confidence.toFixed(2)} ({runs}×)
+    </span>
+  );
+}
+
 function kindColor(kind: string): string {
   if (kind === "lending-interest-bearing") return "var(--color-haram)";
   if (kind === "amm-swap" || kind === "marketplace") return "var(--color-halal)";
