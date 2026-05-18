@@ -1,6 +1,17 @@
-import type { SolanaTokenState, HolderEntry, ProgramInteraction } from "@probity/types";
+import type {
+  SolanaTokenState,
+  HolderEntry,
+  ProgramInteraction,
+  Token2022Extension,
+} from "@probity/types";
 import { HeliusClient } from "./helius";
 import { parseMintAccount, formatSupply } from "./mint-layout";
+import {
+  parseToken2022Mint,
+  TOKEN_2022_PROGRAM_ID,
+  summarizeExtensions,
+  type ParsedExtension,
+} from "./token-2022-layout";
 import { buildProgramInteractions } from "./program-classifier";
 
 const METAPLEX_METADATA_PROGRAM = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s";
@@ -33,9 +44,30 @@ export async function fetchTokenState(
 
   const dataB64 = accInfo.value.data[0];
   const data = Uint8Array.from(Buffer.from(dataB64, "base64"));
-  const parsed = parseMintAccount(data);
+  const owner = accInfo.value.owner;
+  const isToken2022 = owner === TOKEN_2022_PROGRAM_ID;
 
-  const totalSupply = parsed.supply;
+  let mintAuthority: string | null;
+  let freezeAuthority: string | null;
+  let decimals: number;
+  let totalSupply: bigint;
+  let extensions: Token2022Extension[] = [];
+
+  if (isToken2022) {
+    const parsed2022 = parseToken2022Mint(data);
+    mintAuthority = parsed2022.mintAuthority;
+    freezeAuthority = parsed2022.freezeAuthority;
+    decimals = parsed2022.decimals;
+    totalSupply = parsed2022.supply;
+    extensions = parsed2022.extensions.map(toExtensionRecord);
+  } else {
+    const parsed = parseMintAccount(data);
+    mintAuthority = parsed.mintAuthority;
+    freezeAuthority = parsed.freezeAuthority;
+    decimals = parsed.decimals;
+    totalSupply = parsed.supply;
+  }
+
   const top: HolderEntry[] = [];
   let topAmount = 0n;
   for (const h of largest.value.slice(0, 10)) {
@@ -55,12 +87,12 @@ export async function fetchTokenState(
     ? buildProgramInteractions(opts.programInteractions)
     : [];
 
-  return {
+  const state: SolanaTokenState = {
     mint,
-    decimals: parsed.decimals,
-    supply: formatSupply(totalSupply, parsed.decimals),
-    mintAuthority: parsed.mintAuthority,
-    freezeAuthority: parsed.freezeAuthority,
+    decimals,
+    supply: formatSupply(totalSupply, decimals),
+    mintAuthority,
+    freezeAuthority,
     metadata: {
       name: asset?.content.metadata.name ?? "",
       symbol: asset?.content.metadata.symbol ?? "",
@@ -72,8 +104,23 @@ export async function fetchTokenState(
     topHolders: top,
     programInteractions,
     snapshotSlot: slot,
+    tokenProgram: isToken2022 ? "spl-token-2022" : "spl-token",
   };
+  if (extensions.length > 0) state.extensions = extensions;
+  return state;
 }
+
+function toExtensionRecord(e: ParsedExtension): Token2022Extension {
+  const { type, ...rest } = e as ParsedExtension & Record<string, unknown>;
+  return { type, details: rest as Record<string, unknown> };
+}
+
+export function describeExtensions(state: SolanaTokenState): string[] {
+  if (!state.extensions || state.extensions.length === 0) return [];
+  return state.extensions.map((e) => e.type);
+}
+
+export { summarizeExtensions };
 
 // Metaplex metadata PDA = findProgramAddress(
 //   [b"metadata", METAPLEX_METADATA_PROGRAM, mint],

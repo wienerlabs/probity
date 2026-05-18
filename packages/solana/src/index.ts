@@ -13,6 +13,32 @@ export { parseMintAccount, formatSupply, MINT_ACCOUNT_SIZE } from "./mint-layout
 export type { ParsedMint } from "./mint-layout";
 
 export {
+  parseToken2022Mint,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_LEGACY_PROGRAM_ID,
+  summarizeExtensions,
+  hasInterestBearing,
+  hasTransferFee,
+  hasPermanentDelegate,
+  hasNonTransferable,
+  hasConfidentialTransfer,
+  isToken2022Owner,
+} from "./token-2022-layout";
+export type {
+  Token2022Mint,
+  ParsedExtension,
+  ExtensionType,
+  TransferFeeConfig,
+  InterestBearingConfig,
+  PermanentDelegate as Token2022PermanentDelegate,
+  MintCloseAuthority,
+  MetadataPointer,
+  GroupPointer,
+} from "./token-2022-layout";
+
+export { describeExtensions } from "./fetch-token-state";
+
+export {
   classifyProgram,
   buildProgramInteractions,
   listKnownPrograms,

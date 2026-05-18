@@ -67,18 +67,25 @@ export interface TokenMetadata {
   isMutable: boolean;
 }
 
+export interface Token2022Extension {
+  type: string;
+  details?: Record<string, unknown>;
+}
+
 export interface SolanaTokenState {
   mint: string;
   decimals: number;
-  supply: string; // human-readable, source-of-truth
+  supply: string;
   mintAuthority: string | null;
   freezeAuthority: string | null;
   metadata: TokenMetadata;
   metadataAccount: string;
-  topHolderConcentration: number; // 0..1 — share of top 10
+  topHolderConcentration: number;
   topHolders: HolderEntry[];
   programInteractions: ProgramInteraction[];
   snapshotSlot: number;
+  tokenProgram?: "spl-token" | "spl-token-2022";
+  extensions?: Token2022Extension[];
 }
 
 // ---------- Enrichment (off-chain, supplied by ingestion layer) ----------
