@@ -3,27 +3,48 @@ import { CitationList } from "./citation-list";
 
 const OUTCOME_STYLES: Record<
   RuleOutcome["outcome"],
-  { label: string; color: string; bg: string; border: string }
+  { label: string; color: string; bg: string; border: string; glow: string }
 > = {
   pass: {
     label: "Pass",
     color: "var(--color-halal)",
     bg: "var(--color-halal-bg)",
     border: "var(--color-halal-border)",
+    glow: "var(--color-halal-glow)",
   },
   flag: {
     label: "Flag",
     color: "var(--color-mushtabah)",
     bg: "var(--color-mushtabah-bg)",
     border: "var(--color-mushtabah-border)",
+    glow: "var(--color-mushtabah-glow)",
   },
   fail: {
     label: "Fail",
     color: "var(--color-haram)",
     bg: "var(--color-haram-bg)",
     border: "var(--color-haram-border)",
+    glow: "var(--color-haram-glow)",
   },
 };
+
+interface CitationCount {
+  onchain: number;
+  document: number;
+  derivation: number;
+}
+
+function countByKind(o: RuleOutcome): CitationCount {
+  let onchain = 0;
+  let document = 0;
+  let derivation = 0;
+  for (const ev of o.evidence) {
+    if (ev.type === "onchain") onchain++;
+    else if (ev.type === "document") document++;
+    else derivation++;
+  }
+  return { onchain, document, derivation };
+}
 
 export function RuleTable({ outcomes }: { outcomes: RuleOutcome[] }) {
   return (
@@ -37,8 +58,13 @@ export function RuleTable({ outcomes }: { outcomes: RuleOutcome[] }) {
 
 function RuleRow({ outcome }: { outcome: RuleOutcome }) {
   const s = OUTCOME_STYLES[outcome.outcome];
+  const counts = countByKind(outcome);
   return (
-    <details className="surface p-5 group" open={outcome.outcome !== "pass"}>
+    <details
+      className="surface p-5 group"
+      open={outcome.outcome !== "pass"}
+      style={{ boxShadow: outcome.outcome === "fail" ? s.glow : undefined }}
+    >
       <summary className="flex items-start justify-between gap-6 cursor-pointer list-none">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2.5 mb-2 flex-wrap">
@@ -58,6 +84,7 @@ function RuleRow({ outcome }: { outcome: RuleOutcome }) {
                 material
               </span>
             )}
+            <CitationCounts counts={counts} />
           </div>
           <p className="mono text-sm text-[var(--color-text)] truncate">
             {outcome.ruleId}
@@ -79,10 +106,38 @@ function RuleRow({ outcome }: { outcome: RuleOutcome }) {
         style={{ borderTop: "1px solid var(--color-border)" }}
       >
         <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] mb-3">
-          Evidence
+          Evidence ({outcome.evidence.length})
         </p>
         <CitationList citations={outcome.evidence} />
       </div>
     </details>
+  );
+}
+
+function CitationCounts({ counts }: { counts: CitationCount }) {
+  const items: Array<{ label: string; n: number }> = [];
+  if (counts.onchain > 0) items.push({ label: "on-chain", n: counts.onchain });
+  if (counts.document > 0) items.push({ label: "doc", n: counts.document });
+  if (counts.derivation > 0)
+    items.push({ label: "derived", n: counts.derivation });
+  if (items.length === 0) {
+    return (
+      <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)]">
+        no citations
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 ml-1">
+      {items.map((it) => (
+        <span
+          key={it.label}
+          className="text-[10px] uppercase tracking-[0.16em] px-1.5 py-0.5 rounded-full border text-[var(--color-muted)]"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          {it.n} {it.label}
+        </span>
+      ))}
+    </span>
   );
 }

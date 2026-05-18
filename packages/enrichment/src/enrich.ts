@@ -43,6 +43,9 @@ Hard rules:
   native gas tokens, oracle networks).
 - If evidence is unavailable to set governance fields, return null for
   timelockSeconds and multisigThreshold and false for freezeAuthoritySingleKey.
+- For every exposure, populate "source_url" with the exact URL of the
+  document the rationale was extracted from. If the rationale comes
+  from on-chain state with no doc reference, use null.
 
 Output JSON only. No prose. No code fences.
 
@@ -57,7 +60,8 @@ Schema:
                "primary-utility" | "marketplace" | "gaming" | "stablecoin" |
                "infra",
         "revenueShare": 0..1,
-        "rationale": string                // <= 240 chars, cite the supplied evidence
+        "rationale": string,               // <= 240 chars, cite the supplied evidence
+        "source_url": string | null        // URL of the doc the rationale came from
       }
     ],
     "zeroSumRevenueShare": 0..1,

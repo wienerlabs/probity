@@ -2,7 +2,19 @@ export { screen } from "./screen";
 export type { ScreenOptions } from "./screen";
 export { aggregateVerdict, computeScoreBreakdown } from "./aggregate";
 export { canonicalJson, hashEvidence } from "./hash";
+export {
+  buildCitationIndex,
+  summarizeCitations,
+  explorerAccountUrl,
+  explorerTxUrl,
+  explorerSlotUrl,
+  citationIdFor,
+  ruleIdsForCitation,
+} from "./citations";
+export type {
+  CitationIndex,
+  CitationIndexEntry,
+  CitationKind,
+} from "./citations";
 
-// Re-export rule registry helpers so consumers (e.g. API routes) don't
-// have to take a direct workspace dep on @probity/rules.
 export { loadRuleSet, listRuleVersions } from "@probity/rules";

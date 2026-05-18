@@ -61,12 +61,43 @@ function parseSectorTag(v: unknown, path: string): SectorTag {
   return v as SectorTag;
 }
 
-function parseExposure(v: unknown, path: string, defaultSourceUrl: string): SectorExposure {
+function parseExposure(
+  v: unknown,
+  path: string,
+  defaultSourceUrl: string,
+): SectorExposure {
   if (!isObj(v)) throw new EnrichmentValidationError("expected object", path);
   const tag = parseSectorTag(v.tag, `${path}.tag`);
   const revenueShare = num01(v.revenueShare, `${path}.revenueShare`);
   const rationale =
-    typeof v.rationale === "string" ? v.rationale : "(LLM extracted, no rationale provided)";
+    typeof v.rationale === "string"
+      ? v.rationale
+      : "(LLM extracted, no rationale provided)";
+
+  // Prefer an LLM-supplied source_url (one of the docs we handed it).
+  // Only an https?:// or canonical scheme survives; anything else
+  // falls back to the derivation citation so the engine can still
+  // record evidence.
+  const rawSource = v.source_url;
+  const validUrl =
+    typeof rawSource === "string" &&
+    /^(https?|ipfs|ar):\/\//i.test(rawSource.trim())
+      ? rawSource.trim()
+      : null;
+
+  if (validUrl) {
+    return {
+      tag,
+      revenueShare,
+      source: {
+        type: "document",
+        sourceUrl: validUrl,
+        contentHash: "sha256:claude-extract",
+        excerpt: `${tag} · ${(revenueShare * 100).toFixed(1)}% · ${rationale.slice(0, 360)}`,
+      },
+    };
+  }
+
   return {
     tag,
     revenueShare,
@@ -74,6 +105,18 @@ function parseExposure(v: unknown, path: string, defaultSourceUrl: string): Sect
       type: "derivation",
       formula: `claude.extract.exposure(tag=${tag}, share=${revenueShare.toFixed(3)})`,
       result: rationale.slice(0, 480),
+      ...(defaultSourceUrl
+        ? {
+            inputs: [
+              {
+                type: "document",
+                sourceUrl: defaultSourceUrl,
+                contentHash: "sha256:claude-input",
+                excerpt: rationale.slice(0, 200),
+              },
+            ],
+          }
+        : {}),
     },
   };
 }
