@@ -289,7 +289,7 @@ function sanitizeUrl(raw: string | undefined | null): string | null {
 function ipfsToHttps(url: string): string {
   if (url.startsWith("ipfs://")) {
     const cid = url.slice("ipfs://".length).replace(/^ipfs\//, "");
-    return `https://cloudflare-ipfs.com/ipfs/${cid}`;
+    return `https://ipfs.io/ipfs/${cid}`;
   }
   if (url.startsWith("ar://")) {
     const id = url.slice("ar://".length);

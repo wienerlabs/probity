@@ -12,15 +12,47 @@ interface Props {
   verdictTint?: "halal" | "mushtabah" | "haram" | null | undefined;
 }
 
-function ipfsToHttps(url: string): string {
+const IPFS_GATEWAYS = [
+  "https://ipfs.io/ipfs/",
+  "https://nftstorage.link/ipfs/",
+  "https://dweb.link/ipfs/",
+  "https://gateway.pinata.cloud/ipfs/",
+  "https://cf-ipfs.com/ipfs/",
+] as const;
+
+function extractIpfsCid(url: string): string | null {
   if (url.startsWith("ipfs://")) {
-    const cid = url.slice("ipfs://".length).replace(/^ipfs\//, "");
-    return `https://cloudflare-ipfs.com/ipfs/${cid}`;
+    return url.slice("ipfs://".length).replace(/^ipfs\//, "");
   }
-  if (url.startsWith("ar://")) {
-    return `https://arweave.net/${url.slice("ar://".length)}`;
+  const m = url.match(/\/ipfs\/([^/?#]+(?:\/[^?#]*)?)/);
+  return m ? m[1] ?? null : null;
+}
+
+function buildCandidates(url: string): string[] {
+  const trimmed = url.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith("ar://")) {
+    const id = trimmed.slice("ar://".length);
+    return [`https://arweave.net/${id}`, `https://arweave.dev/${id}`];
   }
-  return url;
+
+  const cid = extractIpfsCid(trimmed);
+  if (cid) {
+    const first = trimmed.startsWith("ipfs://")
+      ? `${IPFS_GATEWAYS[0]}${cid}`
+      : trimmed;
+    const rest = IPFS_GATEWAYS.map((g) => `${g}${cid}`).filter((u) => u !== first);
+    return [first, ...rest];
+  }
+
+  if (trimmed.startsWith("http://")) {
+    return ["https://" + trimmed.slice("http://".length)];
+  }
+  if (trimmed.startsWith("https://")) {
+    return [trimmed];
+  }
+  return [];
 }
 
 function paletteForMint(mint: string): { fg: string; bg: string } {
@@ -64,19 +96,21 @@ export function TokenAvatar({
   ring = false,
   verdictTint = null,
 }: Props) {
-  const normalized = useMemo(
-    () => (logoUrl ? ipfsToHttps(logoUrl.trim()) : null),
+  const candidates = useMemo(
+    () => (logoUrl ? buildCandidates(logoUrl) : []),
     [logoUrl],
   );
-  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    setFailed(false);
-  }, [normalized]);
+    setAttempt(0);
+  }, [candidates]);
 
+  const currentSrc = candidates[attempt];
+  const exhausted = candidates.length > 0 && attempt >= candidates.length;
   const initials = initialsFrom(symbol, name);
   const palette = paletteForMint(mint);
   const ringColor = verdictRingColor(verdictTint);
-  const showImage = normalized && !failed;
+  const showImage = !!currentSrc && !exhausted;
   const padding = Math.max(2, Math.round(size * 0.06));
   const innerSize = size - (ring ? 4 : 0);
 
@@ -115,11 +149,12 @@ export function TokenAvatar({
         {showImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={normalized!}
+            key={currentSrc}
+            src={currentSrc}
             alt=""
             width={innerSize - padding * 2}
             height={innerSize - padding * 2}
-            onError={() => setFailed(true)}
+            onError={() => setAttempt((a) => a + 1)}
             referrerPolicy="no-referrer"
             loading="lazy"
             style={{
