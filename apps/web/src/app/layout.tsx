@@ -4,6 +4,8 @@ import "./globals.css";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { ThemeInit } from "@/components/theme-init";
+import { WalletShell } from "@/components/wallet/WalletShell";
+import { AuthProvider } from "@/components/wallet/auth-context";
 
 const funnel = Funnel_Display({
   subsets: ["latin"],
@@ -32,11 +34,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeInit />
       </head>
       <body>
-        <div className="min-h-screen w-full flex flex-col">
-          <Header />
-          <main className="flex-1 w-full">{children}</main>
-          <Footer />
-        </div>
+        <WalletShell>
+          <AuthProvider>
+            <div className="min-h-screen w-full flex flex-col">
+              <Header />
+              <main className="flex-1 w-full">{children}</main>
+              <Footer />
+            </div>
+          </AuthProvider>
+        </WalletShell>
       </body>
     </html>
   );

@@ -1,0 +1,89 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model User {
+  id                String         @id @default(cuid())
+  walletPubkey      String         @unique
+  displayHandle     String?
+  createdAt         DateTime       @default(now())
+  lastLoginAt       DateTime       @default(now())
+  authNonces        AuthNonce[]
+  subscriptions     Subscription[]
+  researchEntries   ResearchEntry[]
+  paymentIntents    PaymentIntent[]
+
+  @@index([createdAt])
+}
+
+model AuthNonce {
+  id           String   @id @default(cuid())
+  walletPubkey String
+  nonce        String   @unique
+  createdAt    DateTime @default(now())
+  consumedAt   DateTime?
+  user         User?    @relation(fields: [userId], references: [id])
+  userId       String?
+
+  @@index([walletPubkey, createdAt])
+}
+
+model PaymentIntent {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expectedRecipient String
+  expectedLamports  String
+  reference         String   @unique
+  createdAt         DateTime @default(now())
+  consumedBy        Subscription?
+
+  @@index([userId, createdAt])
+}
+
+model Subscription {
+  id                 String          @id @default(cuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentIntentId    String?         @unique
+  paymentIntent      PaymentIntent?  @relation(fields: [paymentIntentId], references: [id])
+  txSignature        String          @unique
+  payerPubkey        String
+  recipientPubkey    String
+  lamports           String
+  paidAt             DateTime
+  expiresAt          DateTime
+  active             Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([active, expiresAt])
+}
+
+model ResearchEntry {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mint              String
+  ruleVersion       String
+  verdict           String
+  enrichmentSource  String
+  scannedTransactions Int
+  documentsIngested Int
+  consensusConfidence Float?
+  symbol            String?
+  name              String?
+  logoUrl           String?
+  evidenceHash      String
+  requestedAt       DateTime @default(now())
+
+  @@index([userId, requestedAt])
+  @@index([mint, requestedAt])
+}

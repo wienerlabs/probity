@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "./theme-toggle";
+import { WalletButton } from "./wallet/WalletButton";
 
 export function Header() {
   return (
@@ -39,12 +40,8 @@ export function Header() {
           <NavLink href="/api">API</NavLink>
           <span className="mx-2 h-5 w-px bg-[var(--color-border)]" />
           <ThemeToggle />
-          <Link
-            href="/institutional"
-            className="btn btn-primary ml-2"
-          >
-            Institutional
-          </Link>
+          <span className="mx-2 h-5 w-px bg-[var(--color-border)]" />
+          <WalletButton />
         </nav>
       </div>
     </header>
