@@ -1,6 +1,13 @@
+import { NextRequest } from "next/server";
 import { randomBytes } from "node:crypto";
 import { currentUser } from "@/lib/auth/session";
-import { ok, serverError, unauthorized } from "@/lib/api/responses";
+import {
+  ok,
+  rateLimited,
+  serverError,
+  unauthorized,
+} from "@/lib/api/responses";
+import { check, clientIp } from "@/lib/api/rate-limit";
 import { prisma } from "@/lib/db";
 import {
   subscriptionLamports,
@@ -9,9 +16,23 @@ import {
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const user = await currentUser();
   if (!user) return unauthorized("wallet not authenticated");
+
+  const rate = check({
+    key: `sub:intent:${user.id}`,
+    limit: 10,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!rate.allowed) return rateLimited(rate.retryAfterSeconds);
+
+  const ipRate = check({
+    key: `sub:intent:ip:${clientIp(req.headers)}`,
+    limit: 30,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!ipRate.allowed) return rateLimited(ipRate.retryAfterSeconds);
 
   try {
     const reference = randomBytes(32).toString("hex");
@@ -30,6 +51,7 @@ export async function POST() {
       sol: Number(intent.expectedLamports) / 1_000_000_000,
     });
   } catch (e) {
-    return serverError(e instanceof Error ? e.message : "intent failed");
+    console.error("[subscription/intent]", e);
+    return serverError("intent failed");
   }
 }

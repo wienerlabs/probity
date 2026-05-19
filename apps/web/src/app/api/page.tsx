@@ -103,31 +103,39 @@ export default function ApiPage() {
 
       <section className="mt-10">
         <h2 className="text-xs uppercase tracking-[0.2em] text-[var(--color-muted-2)] mb-3">
-          Demo keys
+          API keys
         </h2>
         <p className="text-[var(--color-muted)] leading-relaxed text-sm mb-4 max-w-2xl">
-          These keys are bundled with the demo build so you can curl the API
-          without onboarding. Real institutional keys are issued through the
-          dashboard and signed with an HMAC secret on the server.
+          Programmatic access is gated by a Bearer token derived from a
+          server-configured HMAC secret. Keys are issued out-of-band; the
+          public API surface ships zero default credentials.
         </p>
-        <div className="surface overflow-hidden divide-y divide-[var(--color-border)]">
-          {listDemoKeys().map((k) => (
-            <div
-              key={k.key}
-              className="grid grid-cols-[1fr_6rem] md:grid-cols-[1fr_6rem_6rem] gap-4 px-5 py-3.5 text-sm"
-            >
-              <span className="mono text-[var(--color-text)] truncate">
-                {k.key}
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] self-center">
-                tier · {k.tier}
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] self-center md:text-right">
-                owner · {k.owner}
-              </span>
-            </div>
-          ))}
-        </div>
+        {listDemoKeys().length === 0 ? (
+          <div className="surface p-5 text-sm text-[var(--color-muted)] leading-relaxed">
+            No API keys are configured on this instance. Operators provision keys
+            via the <span className="mono">PROBITY_API_KEYS</span> environment
+            entry; end users authenticate with a Solana wallet instead.
+          </div>
+        ) : (
+          <div className="surface overflow-hidden divide-y divide-[var(--color-border)]">
+            {listDemoKeys().map((k) => (
+              <div
+                key={k.key}
+                className="grid grid-cols-[1fr_6rem] md:grid-cols-[1fr_6rem_6rem] gap-4 px-5 py-3.5 text-sm"
+              >
+                <span className="mono text-[var(--color-text)] truncate">
+                  {k.key}
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] self-center">
+                  tier · {k.tier}
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--color-muted-2)] self-center md:text-right">
+                  owner · {k.owner}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="mt-10 surface p-6">
@@ -142,17 +150,18 @@ export default function ApiPage() {
             color: "var(--color-text)",
           }}
         >
-{`# Public verdict (no auth)
-curl -s https://probity.wienerlabs.com/api/v1/verdict/UTL | jq .
+{`# Verdict (wallet session OR API key required)
+curl -s https://probity.wienerlabs.com/api/v1/verdict/So11111111111111111111111111111111111111112 \\
+  -H "authorization: Bearer $PROBITY_API_KEY" | jq .
 
-# Active rule manifest
+# Active rule manifest (public)
 curl -s https://probity.wienerlabs.com/api/v1/rules/0.1.0 | jq .
 
-# Batch screen (institutional key)
+# Batch screen (institutional)
 curl -s -X POST https://probity.wienerlabs.com/api/v1/batch \\
-  -H "authorization: Bearer probity_demo_growth_key_a1b2c3" \\
+  -H "authorization: Bearer $PROBITY_API_KEY" \\
   -H "content-type: application/json" \\
-  -d '{"mints":["UTL","DSTB","LND"]}'`}
+  -d '{"mints":["So11111111111111111111111111111111111111112"]}'`}
         </pre>
       </section>
 

@@ -3,14 +3,24 @@ import bs58 from "bs58";
 
 const NONCE_TTL_MS = 5 * 60 * 1000;
 
-export function buildSignMessage(nonce: string, pubkey: string): string {
+export interface SignMessageContext {
+  domain: string;
+  pubkey: string;
+  nonce: string;
+  issuedAt: string;
+}
+
+export function buildSignMessage(ctx: SignMessageContext): string {
   return [
-    "Probity — Sign-In With Solana",
+    `${ctx.domain} wants you to sign in with your Solana account:`,
+    ctx.pubkey,
     "",
-    `Wallet: ${pubkey}`,
-    `Nonce: ${nonce}`,
+    "Probity — sign to authenticate. No fees, no transaction is broadcast.",
     "",
-    "By signing you authenticate with Probity. No fees, no transaction is broadcast.",
+    `Domain: ${ctx.domain}`,
+    `Chain: solana:mainnet`,
+    `Nonce: ${ctx.nonce}`,
+    `Issued At: ${ctx.issuedAt}`,
   ].join("\n");
 }
 
@@ -40,6 +50,16 @@ export function isValidBase58Pubkey(value: string): boolean {
   try {
     const bytes = bs58.decode(value);
     return bytes.length === 32;
+  } catch {
+    return false;
+  }
+}
+
+export function isValidBase58Signature(value: string): boolean {
+  if (typeof value !== "string" || value.length < 64 || value.length > 120)
+    return false;
+  try {
+    return bs58.decode(value).length === 64;
   } catch {
     return false;
   }

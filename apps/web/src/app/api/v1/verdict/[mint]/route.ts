@@ -14,8 +14,12 @@ import {
   ScreeningConfigError,
 } from "@/lib/api/screening-runtime";
 import { currentSession } from "@/lib/auth/session";
-import { DAILY_VERDICT_LIMIT, getQuotaForUser } from "@/lib/quota";
-import { prisma } from "@/lib/db";
+import {
+  abortQuotaReservation,
+  DAILY_VERDICT_LIMIT,
+  finalizeQuotaReservation,
+  reserveQuotaSlot,
+} from "@/lib/quota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,9 +28,15 @@ interface RouteContext {
   params: Promise<{ mint: string }>;
 }
 
+const MINT_PATTERN = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
 export async function GET(req: NextRequest, ctx: RouteContext) {
-  const { mint } = await ctx.params;
+  const { mint: rawMint } = await ctx.params;
+  const mint = rawMint ? decodeURIComponent(rawMint).trim() : "";
   if (!mint) return badRequest("mint path parameter is required");
+  if (!MINT_PATTERN.test(mint)) {
+    return badRequest("mint must be a base58 Solana public key");
+  }
 
   const key = authenticate(req.headers);
   const ip = clientIp(req.headers);
@@ -41,17 +51,16 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     return err(401, "wallet_required", "connect a Solana wallet to screen tokens");
   }
 
-  let userId: string | null = null;
-  let subActive = false;
-  let quotaRemaining = DAILY_VERDICT_LIMIT;
+  let reservationId: string | null = null;
+  let quotaRemainingAfter = DAILY_VERDICT_LIMIT;
   let quotaResetsAt = "";
-  if (sess) {
-    const q = await getQuotaForUser(sess.sub);
-    userId = sess.sub;
-    subActive = q.subscriptionActive;
-    quotaRemaining = q.remaining;
-    quotaResetsAt = q.resetsAt;
-    if (!key && !q.subscriptionActive) {
+  let subActive = !!key;
+
+  if (sess && !key) {
+    const reservation = await reserveQuotaSlot(sess.sub, mint);
+    quotaResetsAt = reservation.resetsAt;
+    subActive = reservation.subscriptionActive;
+    if (reservation.status === "no_subscription") {
       return err(
         402,
         "subscription_required",
@@ -59,46 +68,45 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         { subscribe_url: "/me?subscribe=1" },
       );
     }
-    if (!key && q.remaining <= 0) {
+    if (reservation.status === "exceeded") {
       return err(
         429,
         "daily_quota_exceeded",
         "you've used today's screening quota",
-        { resets_at: q.resetsAt, daily_limit: q.dailyLimit },
+        { resets_at: reservation.resetsAt, daily_limit: reservation.dailyLimit },
       );
     }
+    reservationId = reservation.reservationId ?? null;
+    quotaRemainingAfter = reservation.remainingAfter ?? 0;
   }
 
   const useRecentCache = new URL(req.url).searchParams.get("cache") !== "0";
 
   try {
-    const resolved = await resolveVerdict(decodeURIComponent(mint), {
-      useRecentCache,
-    });
+    const resolved = await resolveVerdict(mint, { useRecentCache });
 
-    if (userId) {
+    if (reservationId) {
       try {
-        await prisma.researchEntry.create({
-          data: {
-            userId,
-            mint: resolved.mint,
-            ruleVersion: resolved.verdict.ruleVersion,
-            verdict: resolved.verdict.verdict,
-            enrichmentSource: resolved.enrichment_source,
-            scannedTransactions: resolved.evidence?.scannedTransactions ?? 0,
-            documentsIngested: resolved.evidence?.documentsIngested ?? 0,
-            ...(resolved.consensus
-              ? { consensusConfidence: resolved.consensus.confidence }
-              : {}),
-            symbol:
-              resolved.verdict.outcomes[0]?.evidence
-                .map((e) => (e.type === "onchain" ? e.value : null))
-                .find((v): v is string => typeof v === "string" && v.length < 10) ?? null,
-            evidenceHash: resolved.verdict.evidenceHash,
-          },
+        await finalizeQuotaReservation({
+          reservationId,
+          mint: resolved.mint,
+          ruleVersion: resolved.verdict.ruleVersion,
+          verdict: resolved.verdict.verdict,
+          enrichmentSource: resolved.enrichment_source,
+          scannedTransactions: resolved.evidence?.scannedTransactions ?? 0,
+          documentsIngested: resolved.evidence?.documentsIngested ?? 0,
+          consensusConfidence: resolved.consensus?.confidence ?? null,
+          symbol:
+            resolved.verdict.outcomes[0]?.evidence
+              .map((e) => (e.type === "onchain" ? e.value : null))
+              .find((v): v is string => typeof v === "string" && v.length < 10) ??
+            null,
+          name: null,
+          logoUrl: null,
+          evidenceHash: resolved.verdict.evidenceHash,
         });
-      } catch {
-        /* ignore — research log is best-effort */
+      } catch (logErr) {
+        console.error("[verdict/persist]", logErr);
       }
     }
 
@@ -115,7 +123,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         ? {
             quota: {
               subscription_active: subActive,
-              remaining: Math.max(0, quotaRemaining - 1),
+              remaining: quotaRemainingAfter,
               resets_at: quotaResetsAt,
               daily_limit: DAILY_VERDICT_LIMIT,
             },
@@ -128,11 +136,12 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         "x-probity-enrichment": resolved.enrichment_source,
         "x-ratelimit-remaining": String(rate.remaining),
         ...(sess
-          ? { "x-probity-quota-remaining": String(Math.max(0, quotaRemaining - 1)) }
+          ? { "x-probity-quota-remaining": String(quotaRemainingAfter) }
           : {}),
       },
     });
   } catch (e) {
+    if (reservationId) await abortQuotaReservation(reservationId);
     if (e instanceof InvalidMintError) {
       return badRequest(e.message);
     }
@@ -141,6 +150,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
         missing_env: e.missing,
       });
     }
-    return serverError(e instanceof Error ? e.message : "unknown error");
+    console.error("[verdict]", e);
+    return serverError("screening failed");
   }
 }
